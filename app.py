@@ -20,10 +20,10 @@ app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', app.config['SECRET_KE
 
 # Veritabanı Bağlantısı - Railway PostgreSQL Desteği
 database_url = os.getenv('DATABASE_URL', 'sqlite:///indirimradar.db')
-if database_url.startswith('postgres://'):
+if database_url and database_url.startswith('postgres://'):
     database_url = database_url.replace('postgres://', 'postgresql://', 1)
 
-app.config['SQLALCHEMY_DATABASE_URI'] = database_url
+app.config['SQLALCHEMY_DATABASE_URI'] = database_url or 'sqlite:///indirimradar.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {'pool_pre_ping': True, 'pool_recycle': 300}
 
@@ -76,10 +76,12 @@ class PriceAlert(db.Model):
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-# ==================== KRİTİK DÜZELTME: OTOMATİK TABLO OLUŞTURMA ====================
-# Bu blok if __name__ dışında olduğu için Railway üzerinde de çalışacaktır.
+# ==================== OTOMATİK KURULUM VE ADMIN OLUŞTURMA ====================
+
 with app.app_context():
     db.create_all()
+    
+    # 1. Örnek Ürün Kontrolü
     if Product.query.count() == 0:
         sample_products = [
             {'title': 'iPhone 15 Pro Max', 'platform': 'Trendyol', 'category': 'Elektronik', 
@@ -91,9 +93,28 @@ with app.app_context():
             p = Product(**data)
             db.session.add(p)
         db.session.commit()
-        print("✅ Veritabanı ve örnek veriler hazır!")
+        print("✅ Örnek veriler eklendi.")
 
-# ==================== ROTALAR (ROTALARIN DEVAMI AYNI KALDI) ====================
+    # 2. ADMIN KULLANICISI OLUŞTURMA (ÖNEMLİ KISIM)
+    admin_email = "admin@indirimradar.com"
+    admin_user = User.query.filter_by(email=admin_email).first()
+    
+    if not admin_user:
+        # Şifre: admin123
+        hashed_pw = generate_password_hash("admin123", method='pbkdf2:sha256')
+        new_admin = User(
+            email=admin_email,
+            password=hashed_pw,
+            is_premium=True,
+            is_admin=True
+        )
+        db.session.add(new_admin)
+        db.session.commit()
+        print(f"😎 Admin oluşturuldu: {admin_email} / Şifre: admin123")
+    else:
+        print("👍 Admin kullanıcısı zaten mevcut.")
+
+# ==================== ROTALAR ====================
 
 @app.route('/health', methods=['GET'])
 def health_check():
@@ -116,7 +137,58 @@ def get_products():
         'total': products.total
     })
 
-# (Diğer rotalarınız olan login, register vb. bu dosyanın devamına eklenebilir)
+# --- GİRİŞ VE KAYIT (Admin hesabına girmek için gerekli) ---
+
+@app.route('/api/auth/login', methods=['POST'])
+def login():
+    try:
+        data = request.get_json()
+        if not data or 'email' not in data or 'password' not in data:
+            return jsonify({'message': 'Email ve şifre gerekli'}), 400
+        
+        email = data['email'].strip().lower()
+        user = User.query.filter_by(email=email).first()
+        
+        if not user or not check_password_hash(user.password, data['password']):
+            return jsonify({'message': 'Geçersiz bilgiler'}), 401
+        
+        # Token oluştur
+        token = jwt.encode({
+            'user_id': user.id,
+            'exp': datetime.utcnow() + timedelta(days=30)
+        }, app.config['SECRET_KEY'], algorithm="HS256")
+        
+        return jsonify({
+            'token': token,
+            'user': {
+                'id': user.id,
+                'email': user.email,
+                'is_admin': user.is_admin,
+                'is_premium': user.is_premium
+            }
+        })
+    except Exception as e:
+        return jsonify({'message': 'Giriş hatası', 'error': str(e)}), 500
+
+@app.route('/api/auth/register', methods=['POST'])
+def register():
+    try:
+        data = request.get_json()
+        email = data.get('email', '').strip().lower()
+        password = data.get('password')
+
+        if User.query.filter_by(email=email).first():
+            return jsonify({'message': 'Kullanıcı zaten var'}), 400
+
+        new_user = User(
+            email=email,
+            password=generate_password_hash(password, method='pbkdf2:sha256')
+        )
+        db.session.add(new_user)
+        db.session.commit()
+        return jsonify({'message': 'Kayıt başarılı'}), 201
+    except Exception as e:
+        return jsonify({'message': 'Kayıt hatası', 'error': str(e)}), 500
 
 if __name__ == '__main__':
     port = int(os.getenv('PORT', 5000))
