@@ -1,0 +1,54 @@
+# create_admin.py
+from app import app, db, User
+from werkzeug.security import generate_password_hash
+
+with app.app_context():
+    # Admin var mı kontrol et
+    admin = User.query.filter_by(email='admin@indirimradar.com').first()
+    
+    if not admin:
+        admin = User(
+            email='admin@indirimradar.com',
+            password=generate_password_hash('Admin123!', method='pbkdf2:sha256'),
+            is_admin=True
+        )
+        db.session.add(admin)
+        db.session.commit()
+        print('✅ Admin created!')
+    else:
+        print('ℹ️ Admin already exists')
+```
+
+---
+
+### **ADIM 3: Frontend Hazırla ve Deploy Et** (Sonraki büyük adım)
+
+---
+
+## 🎊 **KUTLAMA!**
+
+**Backend API şu anda canlı ve çalışıyor:**
+```
+✅ URL: https://indirimradar-backend-production.up.railway.app
+✅ Health: /health
+✅ Products: /api/products
+✅ Database: PostgreSQL (Online)
+✅ Sample Data: 1 ürün
+```
+
+---
+
+## 📝 **ÖNEMLİ BİLGİLER:**
+
+**Backend API URL:**
+```
+https://indirimradar-backend-production.up.railway.app
+```
+
+**Test Endpoints:**
+```
+/health
+/api/products
+/api/stats
+/api/auth/register
+/api/auth/login
