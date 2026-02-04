@@ -10,29 +10,26 @@ import os
 
 app = Flask(__name__)
 
-# CORS Configuration
+# CORS Yapılandırması
 allowed_origins = os.getenv('ALLOWED_ORIGINS', '*').split(',')
 CORS(app, origins=allowed_origins)
 
-# Configuration
-app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-key-12345')
+# Gizli Anahtar Ayarları
+app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production')
 app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', app.config['SECRET_KEY'])
 
-# Database Configuration
-database_url = os.getenv('DATABASE_URL')
-if database_url and database_url.startswith('postgres://'):
+# Veritabanı Bağlantısı - Railway PostgreSQL Desteği
+database_url = os.getenv('DATABASE_URL', 'sqlite:///indirimradar.db')
+if database_url.startswith('postgres://'):
     database_url = database_url.replace('postgres://', 'postgresql://', 1)
 
-app.config['SQLALCHEMY_DATABASE_URI'] = database_url or 'sqlite:///indirimradar.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-    'pool_pre_ping': True,
-    'pool_recycle': 300,
-}
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {'pool_pre_ping': True, 'pool_recycle': 300}
 
 db = SQLAlchemy(app)
 
-# ==================== MODELS ====================
+# ==================== MODELLER ====================
 
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -79,22 +76,24 @@ class PriceAlert(db.Model):
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-# ==================== INITIALIZATION ====================
-
-# Bu kısım Railway'de uygulama ayağa kalkarken tabloları otomatik oluşturur 
+# ==================== KRİTİK DÜZELTME: OTOMATİK TABLO OLUŞTURMA ====================
+# Bu blok if __name__ dışında olduğu için Railway üzerinde de çalışacaktır.
 with app.app_context():
     db.create_all()
-    # Eğer veritabanı boşsa örnek veri ekle 
     if Product.query.count() == 0:
-        sample = Product(
-            title='Örnek Ürün', platform='Railway', category='Test',
-            current_price=100.0, original_price=150.0, discount_percent=33,
-            image_url='https://via.placeholder.com/150', product_url='https://railway.app'
-        )
-        db.session.add(sample)
+        sample_products = [
+            {'title': 'iPhone 15 Pro Max', 'platform': 'Trendyol', 'category': 'Elektronik', 
+             'current_price': 67499, 'original_price': 89999, 'discount_percent': 25, 
+             'image_url': 'https://images.unsplash.com/photo-1696446702001-80b18e0879f9', 
+             'product_url': 'https://www.trendyol.com'}
+        ]
+        for data in sample_products:
+            p = Product(**data)
+            db.session.add(p)
         db.session.commit()
+        print("✅ Veritabanı ve örnek veriler hazır!")
 
-# ==================== ROUTES ====================
+# ==================== ROTALAR (ROTALARIN DEVAMI AYNI KALDI) ====================
 
 @app.route('/health', methods=['GET'])
 def health_check():
@@ -108,15 +107,16 @@ def health_check():
 def get_products():
     page = int(request.args.get('page', 1))
     per_page = int(request.args.get('per_page', 20))
-    products = Product.query.paginate(page=page, per_page=per_page, error_out=False)
+    query = Product.query.order_by(Product.discount_percent.desc())
+    products = query.paginate(page=page, per_page=per_page, error_out=False)
     return jsonify({
         'products': [{
-            'id': p.id, 'title': p.title, 'newPrice': p.current_price, 'discount': p.discount_percent
+            'id': p.id, 'title': p.title, 'newPrice': p.current_price, 'discount': p.discount_percent, 'image': p.image_url
         } for p in products.items],
         'total': products.total
     })
 
-# Diğer login/register/stats rotalarını buraya eklemeye devam edebilirsin.
+# (Diğer rotalarınız olan login, register vb. bu dosyanın devamına eklenebilir)
 
 if __name__ == '__main__':
     port = int(os.getenv('PORT', 5000))
