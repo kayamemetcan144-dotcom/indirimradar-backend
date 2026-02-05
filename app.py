@@ -544,4 +544,4 @@ def init_db():
                     'discount_percent': 40,
                     'image_url': 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=500&q=80',
                     'product_url': 'https://www.n11.com',
-                    'real_deal_s
+                    'real_deal_s'
