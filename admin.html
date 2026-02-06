@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Paneli - İndirimRadar</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background: #f3f4f6; margin: 0; padding: 20px; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        h1, h2 { color: #1e40af; text-align: center; }
+        
+        /* Login Form */
+        #loginSection { display: block; }
+        #dashboardSection { display: none; }
+        
+        input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; }
+        button { width: 100%; padding: 12px; background: #2563eb; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 1rem; }
+        button:hover { background: #1d4ed8; }
+        .btn-delete { background: #ef4444; width: auto; padding: 5px 10px; font-size: 0.8rem; margin-left: 10px; }
+
+        /* Product List */
+        .product-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #eee; }
+        .product-item:last-child { border-bottom: none; }
+        .logout { background: #666; margin-bottom: 20px; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div id="loginSection">
+            <h1>🔒 Admin Girişi</h1>
+            <input type="email" id="email" placeholder="E-posta" value="admin@indirimradar.com">
+            <input type="password" id="password" placeholder="Şifre">
+            <button onclick="login()">Giriş Yap</button>
+            <p id="loginMsg" style="color:red; text-align:center;"></p>
+        </div>
+
+        <div id="dashboardSection">
+            <button class="logout" onclick="logout()">Çıkış Yap</button>
+            <h2>Ürün Yönetimi</h2>
+            
+            <div style="background:#eef2ff; padding:15px; border-radius:5px; margin-bottom:20px;">
+                <h3>Yeni Ürün Ekle</h3>
+                <input type="text" id="newUrl" placeholder="Trendyol, Hepsiburada vb. ürün linki...">
+                <button onclick="addProduct()">Ekle & Takip Et</button>
+            </div>
+
+            <h3>Takipteki Ürünler</h3>
+            <div id="adminProductList">Yükleniyor...</div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = "https://indirimradar-backend-production.up.railway.app";
+        let token = localStorage.getItem('token');
+
+        // Sayfa açılınca kontrol et
+        if (token) {
+            showDashboard();
+        }
+
+        async function login() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            
+            try {
+                const res = await fetch(`${API_URL}/api/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+                
+                const data = await res.json();
+                
+                if (res.ok) {
+                    token = data.token;
+                    localStorage.setItem('token', token);
+                    showDashboard();
+                } else {
+                    document.getElementById('loginMsg').innerText = "Giriş başarısız! Şifreyi kontrol et.";
+                }
+            } catch (e) {
+                alert("Sunucu hatası!");
+            }
+        }
+
+        function showDashboard() {
+            document.getElementById('loginSection').style.display = 'none';
+            document.getElementById('dashboardSection').style.display = 'block';
+            loadAdminProducts();
+        }
+
+        function logout() {
+            localStorage.removeItem('token');
+            location.reload();
+        }
+
+        async function loadAdminProducts() {
+            try {
+                const res = await fetch(`${API_URL}/api/products`);
+                const data = await res.json();
+                
+                // DÜZELTME BURADA YAPILDI:
+                const products = Array.isArray(data) ? data : (data.products || []);
+
+                const list = document.getElementById('adminProductList');
+                list.innerHTML = '';
+                
+                if(products.length === 0) {
+                    list.innerHTML = '<p>Hiç ürün yok.</p>';
+                    return;
+                }
+
+                products.forEach(p => {
+                    list.innerHTML += `
+                        <div class="product-item">
+                            <div>
+                                <strong>${p.title}</strong><br>
+                                <span style="color:green">${p.current_price} TL</span>
+                            </div>
+                            <button class="btn-delete" onclick="deleteProduct(${p.id})">Sil</button>
+                        </div>
+                    `;
+                });
+            } catch (error) {
+                console.error(error);
+                document.getElementById('adminProductList').innerHTML = '<p style="color:red">Veriler yüklenemedi!</p>';
+            }
+        }
+
+        async function addProduct() {
+            const url = document.getElementById('newUrl').value;
+            if(!url) return alert("Link girin!");
+
+            const btn = document.querySelector('button[onclick="addProduct()"]');
+            btn.innerText = "Ekleniyor...";
+            
+            try {
+                const res = await fetch(`${API_URL}/api/products`, {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ url })
+                });
+
+                if(res.ok) {
+                    alert("Ürün eklendi!");
+                    loadAdminProducts();
+                    document.getElementById('newUrl').value = '';
+                } else {
+                    alert("Hata oluştu.");
+                }
+            } catch(e) { console.error(e); }
+            
+            btn.innerText = "Ekle & Takip Et";
+        }
+
+        async function deleteProduct(id) {
+            if(!confirm("Silmek istediğine emin misin?")) return;
+            
+            await fetch(`${API_URL}/api/products/${id}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            loadAdminProducts();
+        }
+    </script>
+</body>
+</html>

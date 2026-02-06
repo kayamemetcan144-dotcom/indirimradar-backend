@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>İndirimRadar - Akıllı Fiyat Takibi</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root { --primary: #2563eb; --secondary: #1e40af; --bg: #f3f4f6; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); margin: 0; }
+        
+        /* Navbar */
+        .navbar { background: white; padding: 1rem 5%; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .logo { font-size: 1.5rem; font-weight: bold; color: var(--primary); text-decoration: none; }
+        .nav-links a { margin-left: 20px; text-decoration: none; color: #333; font-weight: 500; }
+        
+        /* Hero Section */
+        .hero { text-align: center; padding: 4rem 1rem; background: linear-gradient(135deg, var(--primary), var(--secondary)); color: white; }
+        .hero h1 { font-size: 2.5rem; margin-bottom: 1rem; }
+        
+        /* Arama Kutusu ve Manuel Giriş Alanı */
+        .search-container {
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            max-width: 600px;
+            margin: 0 auto;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            color: #333;
+        }
+
+        .search-box { display: flex; gap: 10px; margin-bottom: 10px; }
+        .search-box input { flex: 1; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 1rem; }
+        .search-box button { padding: 12px 25px; background: var(--secondary); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; }
+        .search-box button:hover { background: #1e3a8a; }
+        .search-box button:disabled { background: #ccc; cursor: not-allowed; }
+
+        /* Yeni Eklenen Manuel Fiyat Kutuları */
+        .manual-inputs { display: flex; gap: 10px; }
+        .manual-inputs input { flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 8px; font-size: 0.9rem; }
+
+        /* Ürün Kartları */
+        .products-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 2rem; padding: 2rem 5%; }
+        .product-card { background: white; border-radius: 15px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.05); transition: transform 0.2s; position: relative; }
+        .product-card:hover { transform: translateY(-5px); }
+        
+        .card-badge { position: absolute; top: 10px; right: 10px; background: #ef4444; color: white; padding: 5px 10px; border-radius: 20px; font-weight: bold; font-size: 0.9rem; z-index: 2; }
+        .card-img { height: 200px; width: 100%; object-fit: contain; padding: 20px; background: white; border-bottom: 1px solid #eee; }
+        .card-body { padding: 1.5rem; }
+        .card-title { font-size: 1.1rem; font-weight: 600; margin-bottom: 10px; color: #1f2937; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; height: 2.8em; }
+        
+        .price-box { display: flex; align-items: baseline; gap: 10px; margin-bottom: 15px; }
+        .current-price { font-size: 1.5rem; font-weight: bold; color: var(--primary); }
+        .old-price { text-decoration: line-through; color: #9ca3af; font-size: 0.9rem; }
+        
+        .btn-go { display: block; width: 100%; text-align: center; background: var(--bg); color: var(--primary); padding: 10px; border-radius: 8px; text-decoration: none; font-weight: 600; transition: 0.2s; }
+        .btn-go:hover { background: #e5e7eb; }
+
+        .loading { text-align: center; padding: 2rem; color: #666; }
+    </style>
+</head>
+<body>
+
+    <nav class="navbar">
+        <a href="#" class="logo"><i class="fas fa-bolt"></i> İndirimRadar</a>
+        <div class="nav-links">
+            <a href="#nasil">Nasıl Çalışır?</a>
+            <a href="#populer">Popüler İndirimler</a>
+            <a href="#" class="btn-login">Giriş Yap</a>
+        </div>
+    </nav>
+
+    <header class="hero">
+        <h1>İstediğin Ürünü Takip Et, İndirimi Yakala!</h1>
+        <p>Hepsiburada, Trendyol ve N11 linkini yapıştır, fiyat düşünce haber verelim.</p>
+        <br>
+        
+        <div class="search-container">
+            <div class="search-box">
+                <input type="text" id="productUrl" placeholder="Ürün linkini buraya yapıştır...">
+                <button onclick="trackProduct()">Takip Et</button>
+            </div>
+            
+            <div class="manual-inputs">
+                <input type="number" id="manualPrice" placeholder="Manuel Fiyat (Opsiyonel - Örn: 64.99)">
+                <input type="number" id="manualOldPrice" placeholder="Eski Fiyat (Opsiyonel - Örn: 89.99)">
+            </div>
+            <div style="text-align: left; font-size: 0.8rem; color: #666; margin-top: 5px; padding-left: 5px;">
+                * Fiyat kutularını boş bırakırsanız bot otomatik bulmaya çalışır.
+            </div>
+        </div>
+    </header>
+
+    <section id="populer">
+        <h2 style="text-align: center; margin-top: 3rem; color: #1f2937;">🔥 Popüler İndirimler</h2>
+        <div class="products-grid" id="products-container">
+            <div class="loading">Yükleniyor...</div>
+        </div>
+    </section>
+
+    <script>
+        // API Adresini buraya yaz (Senin Railway adresin)
+        const API_URL = "https://indirimradar-backend-production.up.railway.app"; 
+
+        // Sayfa açılınca ürünleri yükle
+        window.onload = loadProducts;
+
+        async function loadProducts() {
+            const container = document.getElementById('products-container');
+            
+            try {
+                const res = await fetch(`${API_URL}/api/products`);
+                const data = await res.json();
+
+                container.innerHTML = ''; // Yükleniyor yazısını temizle
+
+                if (data.products.length === 0) {
+                    container.innerHTML = '<p style="text-align:center; width:100%">Henüz takip edilen ürün yok.</p>';
+                    return;
+                }
+
+                data.products.forEach(p => {
+                    // İndirim etiketi var mı?
+                    const badgeHtml = p.discount > 0 
+                        ? `<div class="card-badge">%${p.discount} İndirim</div>` 
+                        : '';
+                    
+                    // Eski fiyat var mı?
+                    const oldPriceHtml = p.oldPrice > p.newPrice 
+                        ? `<span class="old-price">${p.oldPrice} TL</span>` 
+                        : '';
+
+                    const html = `
+                        <div class="product-card">
+                            ${badgeHtml}
+                            <img src="${p.image}" alt="${p.title}" class="card-img" onerror="this.src='https://via.placeholder.com/300?text=Resim+Yok'">
+                            <div class="card-body">
+                                <div class="card-title" title="${p.title}">${p.title}</div>
+                                <div class="price-box">
+                                    <span class="current-price">${p.newPrice} TL</span>
+                                    ${oldPriceHtml}
+                                </div>
+                                <a href="${p.url}" target="_blank" class="btn-go">Ürüne Git &rarr;</a>
+                            </div>
+                        </div>
+                    `;
+                    container.innerHTML += html;
+                });
+            } catch (error) {
+                console.error("Hata:", error);
+                container.innerHTML = '<p style="color:red; text-align:center">Sunucuya bağlanılamadı! (Backend çalışıyor mu?)</p>';
+            }
+        }
+
+        async function trackProduct() {
+            // 1. Verileri Al
+            const url = document.getElementById('productUrl').value;
+            const manualPrice = document.getElementById('manualPrice').value;
+            const manualOldPrice = document.getElementById('manualOldPrice').value;
+
+            if (!url) return alert("Lütfen bir link girin!");
+
+            // 2. Butonu Kilitle
+            const btn = document.querySelector('.search-box button');
+            const originalText = btn.innerText;
+            btn.innerText = "Ekleniyor...";
+            btn.disabled = true;
+
+            try {
+                // 3. Backend'e Gönder (Manuel verilerle birlikte)
+                const res = await fetch(`${API_URL}/api/products`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        url: url,
+                        manual_price: manualPrice ? parseFloat(manualPrice) : null,
+                        manual_old_price: manualOldPrice ? parseFloat(manualOldPrice) : null
+                    })
+                });
+                
+                const data = await res.json();
+
+                if (res.ok) {
+                    alert("✅ Ürün başarıyla takibe alındı!");
+                    
+                    // Formu Temizle
+                    document.getElementById('productUrl').value = '';
+                    document.getElementById('manualPrice').value = '';
+                    document.getElementById('manualOldPrice').value = '';
+                    
+                    // Listeyi Yenile
+                    loadProducts(); 
+                } else {
+                    alert("❌ Hata: " + (data.message || "Bilinmeyen hata"));
+                }
+            } catch (e) {
+                console.error(e);
+                alert("Sunucu hatası! (Konsola bak)");
+            } finally {
+                // 4. Butonu Aç
+                btn.innerText = originalText;
+                btn.disabled = false;
+            }
+        }
+    </script>
+</body>
+</html>
