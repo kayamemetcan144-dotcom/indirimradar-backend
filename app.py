@@ -8,14 +8,14 @@ from sqlalchemy import text
 import jwt
 import os
 
-# --- YENİ EKLENEN: Scraper'ı çağırıyoruz ---
+# Scraper'ı çağırıyoruz
 from scraper import ProductScraper 
 
 app = Flask(__name__)
 
 # CORS Configuration
 allowed_origins = os.getenv('ALLOWED_ORIGINS', '*').split(',')
-CORS(app, resources={r"/api/*": {"origins": "*"}}) # Tüm kapıları açtık (Garanti olsun)
+CORS(app, resources={r"/api/*": {"origins": "*"}})
 
 # Configuration
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production')
@@ -32,7 +32,7 @@ app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {'pool_pre_ping': True, 'pool_recycle'
 
 db = SQLAlchemy(app)
 
-# ==================== MODELS (Aynı Kalıyor) ====================
+# ==================== MODELS ====================
 
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -139,10 +139,10 @@ def login():
 
 # ==================== PRODUCT ROUTES (GÜNCELLENDİ) ====================
 
-# 1. GET Products (Listeleme)
 @app.route('/api/products', methods=['GET'])
 def get_products():
     page = int(request.args.get('page', 1))
+    # En yeni eklenenler en üstte olsun
     products = Product.query.order_by(Product.id.desc()).paginate(page=page, per_page=20, error_out=False)
     
     return jsonify({
@@ -162,40 +162,79 @@ def get_products():
         'current_page': products.page
     })
 
-# 2. POST Products (YENİ - Link ile Ekleme - SCRAPING BURADA!)
+# --- YENİ EKLENEN ÖZELLİK: MANUEL FİYAT DESTEĞİ ---
 @app.route('/api/products', methods=['POST'])
 def add_product_via_link():
     data = request.get_json()
     url = data.get('url')
     
+    # Ön yüzden gelen manuel fiyatlar (varsa)
+    manual_price = data.get('manual_price') # Satış Fiyatı (İndirimli)
+    manual_old_price = data.get('manual_old_price') # Normal Fiyat (Üstü Çizili)
+    
     if not url:
         return jsonify({'message': 'URL gerekli'}), 400
 
-    # 1. Önce bu ürün zaten var mı bakalım
     existing = Product.query.filter_by(product_url=url).first()
     if existing:
         return jsonify({'message': 'Bu ürün zaten takip ediliyor', 'id': existing.id}), 200
 
-    # 2. Yoksa Scraper'ı çalıştır
     try:
         print(f"🕵️‍♂️ Scraping başlatılıyor: {url}")
+        
+        # 1. Önce Bot Bilgileri Çeksin (Resim, Başlık vb. için)
         scraper = ProductScraper(headless=True)
         product_data = scraper.scrape_single_product(url)
         
         if not product_data:
-            return jsonify({'message': 'Ürün bilgileri çekilemedi. Linki kontrol edin.'}), 400
+            # Bot tamamen patlarsa ama manuel fiyat varsa, manuel veriyle devam etmeyi dene
+             if manual_price:
+                 product_data = {
+                     'title': 'Manuel Eklenen Ürün',
+                     'image_url': 'https://via.placeholder.com/300', # Yer tutucu resim
+                     'platform': 'Manuel',
+                     'category': 'Diğer'
+                 }
+             else:
+                 return jsonify({'message': 'Ürün bilgileri çekilemedi.'}), 400
         
+        # 2. MANUEL FİYAT KONTROLÜ (En Önemli Kısım)
+        # Eğer kullanıcı elle fiyat girdiyse, botun bulduğu fiyatı ez!
+        if manual_price:
+            try:
+                product_data['current_price'] = float(manual_price)
+                print(f"✏️ Manuel Satış Fiyatı Kullanıldı: {product_data['current_price']}")
+            except: pass
+            
+        if manual_old_price:
+            try:
+                product_data['original_price'] = float(manual_old_price)
+                print(f"✏️ Manuel Eski Fiyat Kullanıldı: {product_data['original_price']}")
+            except: pass
+            
+        # Eğer manuel giriş varsa İndirim Oranını tekrar hesapla
+        if manual_price and manual_old_price:
+            if product_data['original_price'] > product_data['current_price']:
+                diff = product_data['original_price'] - product_data['current_price']
+                product_data['discount_percent'] = int((diff / product_data['original_price']) * 100)
+                if product_data['discount_percent'] > 20: 
+                    product_data['real_deal_status'] = 'real'
+                else:
+                    product_data['real_deal_status'] = 'normal'
+            else:
+                product_data['discount_percent'] = 0
+
         # 3. Veritabanına kaydet
         new_product = Product(
-            title=product_data['title'],
-            platform=product_data['platform'],
-            category=product_data['category'],
-            current_price=product_data['current_price'],
-            original_price=product_data['original_price'],
-            discount_percent=product_data['discount_percent'],
-            image_url=product_data['image_url'],
-            product_url=product_data['product_url'],
-            real_deal_status='normal'
+            title=product_data.get('title', 'Başlık Yok'),
+            platform=product_data.get('platform', 'Diğer'),
+            category=product_data.get('category', 'Genel'),
+            current_price=product_data.get('current_price', 0),
+            original_price=product_data.get('original_price', 0),
+            discount_percent=product_data.get('discount_percent', 0),
+            image_url=product_data.get('image_url', ''),
+            product_url=url,
+            real_deal_status=product_data.get('real_deal_status', 'normal')
         )
         
         db.session.add(new_product)
@@ -212,17 +251,14 @@ def add_product_via_link():
         print(f"❌ Hata: {e}")
         return jsonify({'message': 'Sunucu hatası', 'error': str(e)}), 500
 
-# 3. DELETE Product (Silme)
 @app.route('/api/products/<int:id>', methods=['DELETE'])
-def delete_product(id):
-    # Basitlik için admin kontrolü kapalı, herkes silebilir (Demo modu)
+@token_required
+@admin_required
+def delete_product(current_user, id):
     product = Product.query.get_or_404(id)
-    
-    # İlişkili kayıtları temizle
     PriceHistory.query.filter_by(product_id=id).delete()
     Favorite.query.filter_by(product_id=id).delete()
     PriceAlert.query.filter_by(product_id=id).delete()
-    
     db.session.delete(product)
     db.session.commit()
     return jsonify({'message': 'Ürün silindi'})
@@ -232,7 +268,6 @@ def delete_product(id):
 def init_db():
     with app.app_context():
         db.create_all()
-        # Admin User Ekle
         if not User.query.filter_by(email='admin@indirimradar.com').first():
             admin = User(
                 email='admin@indirimradar.com',
@@ -243,7 +278,6 @@ def init_db():
             db.session.commit()
             print("✅ Admin oluşturuldu.")
 
-# Başlangıçta çalıştır
 init_db()
 
 if __name__ == '__main__':
