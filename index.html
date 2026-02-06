@@ -23,7 +23,7 @@
             background: white;
             padding: 20px;
             border-radius: 15px;
-            max-width: 600px;
+            max-width: 700px; /* Genişlettik */
             margin: 0 auto;
             box-shadow: 0 4px 6px rgba(0,0,0,0.1);
             color: #333;
@@ -36,8 +36,13 @@
         .search-box button:disabled { background: #ccc; cursor: not-allowed; }
 
         /* Yeni Eklenen Manuel Fiyat Kutuları */
-        .manual-inputs { display: flex; gap: 10px; }
-        .manual-inputs input { flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 8px; font-size: 0.9rem; }
+        .manual-inputs { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+        .manual-inputs input { padding: 10px; border: 1px solid #ddd; border-radius: 8px; font-size: 0.9rem; }
+        
+        /* Mobilde alt alta olsun */
+        @media (max-width: 600px) {
+            .manual-inputs { grid-template-columns: 1fr; }
+        }
 
         /* Ürün Kartları */
         .products-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 2rem; padding: 2rem 5%; }
@@ -64,35 +69,34 @@
     <nav class="navbar">
         <a href="#" class="logo"><i class="fas fa-bolt"></i> İndirimRadar</a>
         <div class="nav-links">
-            <a href="#nasil">Nasıl Çalışır?</a>
-            <a href="#populer">Popüler İndirimler</a>
             <a href="#" class="btn-login">Giriş Yap</a>
         </div>
     </nav>
 
     <header class="hero">
-        <h1>İstediğin Ürünü Takip Et, İndirimi Yakala!</h1>
-        <p>Hepsiburada, Trendyol ve N11 linkini yapıştır, fiyat düşünce haber verelim.</p>
+        <h1>İstediğin Ürünü Takip Et!</h1>
+        <p>Link yapıştır, fiyatları istersen elle gir, istersen bot bulsun.</p>
         <br>
         
         <div class="search-container">
             <div class="search-box">
                 <input type="text" id="productUrl" placeholder="Ürün linkini buraya yapıştır...">
-                <button onclick="trackProduct()">Takip Et</button>
+                <button onclick="trackProduct()">Ekle & Takip Et</button>
             </div>
             
             <div class="manual-inputs">
-                <input type="number" id="manualPrice" placeholder="Manuel Fiyat (Opsiyonel - Örn: 64.99)">
-                <input type="number" id="manualOldPrice" placeholder="Eski Fiyat (Opsiyonel - Örn: 89.99)">
+                <input type="number" id="manualPrice" placeholder="Satış Fiyatı (Örn: 64.99)">
+                <input type="number" id="manualOldPrice" placeholder="Eski Fiyat (Örn: 89.99)">
+                <input type="number" id="manualDiscount" placeholder="İndirim % (Örn: 25)">
             </div>
             <div style="text-align: left; font-size: 0.8rem; color: #666; margin-top: 5px; padding-left: 5px;">
-                * Fiyat kutularını boş bırakırsanız bot otomatik bulmaya çalışır.
+                * Kutuları boş bırakırsan bot otomatik bulur. Doluysa senin yazdığını kullanır.
             </div>
         </div>
     </header>
 
     <section id="populer">
-        <h2 style="text-align: center; margin-top: 3rem; color: #1f2937;">🔥 Popüler İndirimler</h2>
+        <h2 style="text-align: center; margin-top: 3rem; color: #1f2937;">🔥 Takip Edilen Ürünler</h2>
         <div class="products-grid" id="products-container">
             <div class="loading">Yükleniyor...</div>
         </div>
@@ -112,7 +116,7 @@
                 const res = await fetch(`${API_URL}/api/products`);
                 const data = await res.json();
 
-                container.innerHTML = ''; // Yükleniyor yazısını temizle
+                container.innerHTML = ''; 
 
                 if (data.products.length === 0) {
                     container.innerHTML = '<p style="text-align:center; width:100%">Henüz takip edilen ürün yok.</p>';
@@ -120,24 +124,22 @@
                 }
 
                 data.products.forEach(p => {
-                    // İndirim etiketi var mı?
-                    const badgeHtml = p.discount > 0 
-                        ? `<div class="card-badge">%${p.discount} İndirim</div>` 
+                    const badgeHtml = p.discount_percent > 0 
+                        ? `<div class="card-badge">%${p.discount_percent} İndirim</div>` 
                         : '';
                     
-                    // Eski fiyat var mı?
-                    const oldPriceHtml = p.oldPrice > p.newPrice 
-                        ? `<span class="old-price">${p.oldPrice} TL</span>` 
+                    const oldPriceHtml = p.original_price > p.current_price 
+                        ? `<span class="old-price">${p.original_price} TL</span>` 
                         : '';
 
                     const html = `
                         <div class="product-card">
                             ${badgeHtml}
-                            <img src="${p.image}" alt="${p.title}" class="card-img" onerror="this.src='https://via.placeholder.com/300?text=Resim+Yok'">
+                            <img src="${p.image_url}" alt="${p.title}" class="card-img" onerror="this.src='https://via.placeholder.com/300?text=Resim+Yok'">
                             <div class="card-body">
                                 <div class="card-title" title="${p.title}">${p.title}</div>
                                 <div class="price-box">
-                                    <span class="current-price">${p.newPrice} TL</span>
+                                    <span class="current-price">${p.current_price} TL</span>
                                     ${oldPriceHtml}
                                 </div>
                                 <a href="${p.url}" target="_blank" class="btn-go">Ürüne Git &rarr;</a>
@@ -148,7 +150,7 @@
                 });
             } catch (error) {
                 console.error("Hata:", error);
-                container.innerHTML = '<p style="color:red; text-align:center">Sunucuya bağlanılamadı! (Backend çalışıyor mu?)</p>';
+                container.innerHTML = '<p style="color:red; text-align:center">Sunucuya bağlanılamadı!</p>';
             }
         }
 
@@ -157,36 +159,39 @@
             const url = document.getElementById('productUrl').value;
             const manualPrice = document.getElementById('manualPrice').value;
             const manualOldPrice = document.getElementById('manualOldPrice').value;
+            const manualDiscount = document.getElementById('manualDiscount').value; // YENİ
 
             if (!url) return alert("Lütfen bir link girin!");
 
             // 2. Butonu Kilitle
             const btn = document.querySelector('.search-box button');
             const originalText = btn.innerText;
-            btn.innerText = "Ekleniyor...";
+            btn.innerText = "İşleniyor...";
             btn.disabled = true;
 
             try {
-                // 3. Backend'e Gönder (Manuel verilerle birlikte)
+                // 3. Backend'e Gönder
                 const res = await fetch(`${API_URL}/api/products`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ 
                         url: url,
                         manual_price: manualPrice ? parseFloat(manualPrice) : null,
-                        manual_old_price: manualOldPrice ? parseFloat(manualOldPrice) : null
+                        manual_old_price: manualOldPrice ? parseFloat(manualOldPrice) : null,
+                        manual_discount: manualDiscount ? parseInt(manualDiscount) : null // YENİ
                     })
                 });
                 
                 const data = await res.json();
 
                 if (res.ok) {
-                    alert("✅ Ürün başarıyla takibe alındı!");
+                    alert("✅ Ürün başarıyla eklendi!");
                     
                     // Formu Temizle
                     document.getElementById('productUrl').value = '';
                     document.getElementById('manualPrice').value = '';
                     document.getElementById('manualOldPrice').value = '';
+                    document.getElementById('manualDiscount').value = '';
                     
                     // Listeyi Yenile
                     loadProducts(); 
@@ -197,7 +202,6 @@
                 console.error(e);
                 alert("Sunucu hatası! (Konsola bak)");
             } finally {
-                // 4. Butonu Aç
                 btn.innerText = originalText;
                 btn.disabled = false;
             }
