@@ -57,7 +57,9 @@ def add_product_via_link():
     url = data.get('url')
     manual_price = data.get('manual_price')
     manual_old_price = data.get('manual_old_price')
-    manual_discount = data.get('manual_discount') # YENİ
+    manual_discount = data.get('manual_discount')
+    manual_image = data.get('manual_image')     # YENİ
+    manual_category = data.get('manual_category') # YENİ
 
     if not url: return jsonify({'message': 'URL gerekli'}), 400
     existing = Product.query.filter_by(product_url=url).first()
@@ -72,8 +74,11 @@ def add_product_via_link():
                  product_data = {'title': 'Manuel Ürün', 'image_url': 'https://via.placeholder.com/300', 'platform': 'Manuel', 'category': 'Diğer', 'current_price': 0, 'original_price': 0}
              else: return jsonify({'message': 'Ürün bilgileri çekilemedi.'}), 400
         
+        # Manuel Veri Önceliği
         if manual_price: product_data['current_price'] = float(manual_price)
         if manual_old_price: product_data['original_price'] = float(manual_old_price)
+        if manual_image: product_data['image_url'] = manual_image # YENİ
+        if manual_category: product_data['category'] = manual_category # YENİ
         
         # İndirim Hesabı
         if manual_discount:
