@@ -23,11 +23,14 @@ class ProductScraper:
         chrome_options = Options()
         if self.headless: chrome_options.add_argument('--headless')
         
+        # Bot Tespitini Aşma (Anti-Detection)
         chrome_options.add_argument('--no-sandbox')
         chrome_options.add_argument('--disable-dev-shm-usage')
         chrome_options.add_argument('--disable-gpu')
         chrome_options.add_argument('--window-size=1920,1080')
+        # Gerçek bir kullanıcı gibi görünmek için User-Agent
         chrome_options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36')
+        
         chrome_options.binary_location = chrome_path
 
         from selenium.webdriver.chrome.service import Service
@@ -43,7 +46,7 @@ class ProductScraper:
         print(f"🔗 İnceleniyor: {url}")
         driver = self.setup_selenium()
         
-        # Varsayılan Değerler
+        # Varsayılan Boş Veri
         product_data = {
             'title': 'Ürün Başlığı Bulunamadı',
             'current_price': 0.0,
@@ -57,94 +60,66 @@ class ProductScraper:
 
         try:
             driver.get(url)
-            time.sleep(5) # Sayfanın tam yüklenmesi için bekle
-            soup = BeautifulSoup(driver.page_source, 'html.parser')
+            time.sleep(3) # Sayfanın yüklenmesini bekle
+            page_source = driver.page_source
+            soup = BeautifulSoup(page_source, 'html.parser')
             
-            # === YÖNTEM 1: JSON-LD (Google Verisi - En Güvenilir) ===
-            # Sayfanın arkasındaki gizli kimlik kartını okuyoruz.
-            scripts = soup.find_all('script', type='application/ld+json')
-            for script in scripts:
-                try:
-                    data = json.loads(script.text)
-                    if isinstance(data, list): data = data[0] # Bazen liste içinde gelir
+            # === 1. FİYAT BULMA (3 Aşamalı Kontrol) ===
+            current_price = 0.0
+            original_price = 0.0
+
+            # YÖNTEM A: Script Regex (En Güvenilir - Taksit Fiyatını Atlar)
+            # Sayfa kodunda 'currentPrice': 64.99 gibi yazan yeri bulur
+            try:
+                # currentPrice veya price değişkenini ara
+                matches = re.findall(r'"currentPrice":\s*([\d\.]+)', page_source)
+                if not matches:
+                    matches = re.findall(r'"price":\s*([\d\.]+)', page_source)
+                
+                valid_prices = []
+                for m in matches:
+                    p = float(m)
+                    if p > 15: # 15 TL altı (Taksit vb.) filtrele
+                        valid_prices.append(p)
+                
+                if valid_prices:
+                    current_price = min(valid_prices) # En düşük geçerli fiyat satış fiyatıdır
+                    print(f"💰 Script Fiyatı Bulundu: {current_price}")
                     
-                    # Eğer bu bir Ürün verisiyse
-                    if data.get('@type') == 'Product':
-                        print("✅ Resmi Ürün Verisi (JSON-LD) Bulundu!")
-                        
-                        # 1. Başlık
-                        if 'name' in data: 
-                            product_data['title'] = data['name']
-                        
-                        # 2. Resim (Liste veya tek link olabilir)
-                        if 'image' in data:
-                            imgs = data['image']
-                            if isinstance(imgs, list) and len(imgs) > 0:
-                                product_data['image_url'] = imgs[0]
-                            elif isinstance(imgs, str):
-                                product_data['image_url'] = imgs
+                    # Eski fiyatı da script'ten ara
+                    orig_matches = re.findall(r'"originalPrice":\s*([\d\.]+)', page_source)
+                    if orig_matches:
+                        original_price = float(orig_matches[0])
+            except: pass
 
-                        # 3. Fiyat (Offers içinde olur)
-                        if 'offers' in data:
-                            offer = data['offers']
-                            if isinstance(offer, list): offer = offer[0] # İlk teklifi al
-                            
-                            price = str(offer.get('price', 0))
-                            product_data['current_price'] = float(price)
-                            # JSON-LD genelde sadece satış fiyatını verir, eski fiyatı vermez.
-                            # O yüzden şimdilik eski fiyat = yeni fiyat yapalım, aşağıda düzelteceğiz.
-                            product_data['original_price'] = product_data['current_price']
-                        
-                        break # Veriyi bulduk, döngüden çık
-                except:
-                    continue
+            # YÖNTEM B: CSS Selectors (Etiket Okuma) - Yedek
+            if current_price == 0:
+                price_box = soup.find(['span', 'div'], {'data-test-id': 'price-current-price'})
+                if price_box:
+                    current_price = self.parse_price(price_box.text)
+                    print(f"💰 Etiket Fiyatı Bulundu: {current_price}")
+                
+                old_price_box = soup.find(['span', 'div'], {'data-test-id': 'price-old-price'})
+                if old_price_box:
+                    original_price = self.parse_price(old_price_box.text)
 
-            # === YÖNTEM 2: EKSİK VERİLERİ TAMAMLAMA (HTML'den) ===
+            # YÖNTEM C: JSON-LD (Google Verisi) - Son Çare
+            if current_price == 0:
+                scripts = soup.find_all('script', type='application/ld+json')
+                for script in scripts:
+                    if 'offers' in script.text:
+                        try:
+                            data = json.loads(script.text)
+                            if isinstance(data, list): data = data[0]
+                            offer = data.get('offers', {})
+                            if isinstance(offer, list): offer = offer[0]
+                            current_price = float(str(offer.get('price', 0)))
+                            break
+                        except: pass
+
+            # === 2. RESİM BULMA ===
+            image_url = ""
             
-            # Eğer resim JSON'dan gelmediyse HTML'den al
-            if not product_data['image_url']:
-                img = soup.find('img', {'class': 'product-image'})
-                if img: product_data['image_url'] = img.get('src')
-            
-            # Eğer Başlık gelmediyse
-            if product_data['title'] == 'Ürün Başlığı Bulunamadı':
-                h1 = soup.find('h1', {'id': 'product-name'})
-                if h1: product_data['title'] = h1.text.strip()
-
-            # === YÖNTEM 3: ESKİ FİYAT VE İNDİRİM (HTML'den Kontrol) ===
-            # JSON-LD sadece "64.99" der. "89.99" demez. Onu HTML'den bulacağız.
-            
-            # HTML'deki "Eski Fiyat" etiketine bak
-            old_price_html = soup.find(['div', 'span', 'del'], {'data-test-id': 'price-old-price'})
-            
-            if old_price_html:
-                old_val = self.parse_price(old_price_html.text)
-                if old_val > product_data['current_price']:
-                    product_data['original_price'] = old_val
-                    print(f"✅ Eski Fiyat HTML'den Bulundu: {old_val}")
-
-            # İndirim Hesapla
-            if product_data['original_price'] > product_data['current_price']:
-                diff = product_data['original_price'] - product_data['current_price']
-                product_data['discount_percent'] = int((diff / product_data['original_price']) * 100)
-
-            # Temizlik
-            product_data['title'] = product_data['title'].strip()
-
-        except Exception as e:
-            print(f"❌ Hata oluştu: {e}")
-        finally:
-            driver.quit()
-            
-        return product_data
-
-    def parse_price(self, text):
-        if not text: return 0.0
-        # "89,99 TL" -> 89.99
-        text = str(text).replace('TL', '').replace('tl', '').strip()
-        # 1.250,50 -> 1250.50
-        clean = text.replace('.', '').replace(',', '.')
-        try:
-            return float(clean)
-        except:
-            return 0.0
+            # Öncelik 1: OpenGraph (Facebook Resmi)
+            og_img = soup.find("meta", property="og:image")
+            if og_img: image_url = og_
