@@ -2,7 +2,7 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
-from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.security import generate_password_hash
 import os
 from scraper import ProductScraper 
 
@@ -11,7 +11,6 @@ app = Flask(__name__)
 # Ayarlar
 allowed_origins = os.getenv('ALLOWED_ORIGINS', '*').split(',')
 CORS(app, resources={r"/api/*": {"origins": "*"}})
-
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret')
 database_url = os.getenv('DATABASE_URL', 'sqlite:///indirimradar.db')
 if database_url.startswith('postgres://'): database_url = database_url.replace('postgres://', 'postgresql://', 1)
@@ -20,7 +19,6 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
 
-# --- MODELLER ---
 class Product(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(500), nullable=False)
@@ -45,10 +43,6 @@ class User(db.Model):
     email = db.Column(db.String(120), unique=True, nullable=False)
     password = db.Column(db.String(200), nullable=False)
     is_admin = db.Column(db.Boolean, default=False)
-    # İlişkiler (Gerekirse)
-    # favorites = ...
-
-# --- ROTALAR ---
 
 @app.route('/api/products', methods=['GET'])
 def get_products():
@@ -56,14 +50,13 @@ def get_products():
     products = Product.query.order_by(Product.id.desc()).paginate(page=page, per_page=20, error_out=False)
     return jsonify({
         'products': [{
-            'id': p.id, 'title': p.title, 'platform': p.platform,
+            'id': p.id, 'title': p.title, 'platform': p.platform, 'category': p.category,
             'current_price': p.current_price, 'original_price': p.original_price,
             'discount_percent': p.discount_percent, 'image_url': p.image_url,
             'url': p.product_url, 'real_deal_status': p.real_deal_status
         } for p in products.items]
     })
 
-# Manuel Fiyat Destekleyen Ekleme Fonksiyonu
 @app.route('/api/products', methods=['POST'])
 def add_product_via_link():
     data = request.get_json()
@@ -77,26 +70,18 @@ def add_product_via_link():
     if existing: return jsonify({'message': 'Bu ürün zaten takip ediliyor', 'id': existing.id}), 200
 
     try:
-        # Bot veriyi çekmeye çalışır (Resim vb. için)
         scraper = ProductScraper(headless=True)
         product_data = scraper.scrape_single_product(url)
         
-        # Bot başarısız olsa bile manuel fiyat varsa devam et
         if not product_data:
              if manual_price:
                  product_data = {'title': 'Manuel Ürün', 'image_url': '', 'platform': 'Manuel', 'category': 'Diğer', 'current_price': 0, 'original_price': 0}
              else:
                  return jsonify({'message': 'Ürün bilgileri çekilemedi.'}), 400
         
-        # MANUEL FİYAT VARSA BOTU EZ
-        if manual_price: 
-            product_data['current_price'] = float(manual_price)
-            print(f"✏️ Manuel Fiyat Kullanıldı: {manual_price}")
-
-        if manual_old_price: 
-            product_data['original_price'] = float(manual_old_price)
+        if manual_price: product_data['current_price'] = float(manual_price)
+        if manual_old_price: product_data['original_price'] = float(manual_old_price)
             
-        # İndirim Hesabı (Otomatik)
         if product_data.get('original_price', 0) > product_data.get('current_price', 0):
             diff = product_data['original_price'] - product_data['current_price']
             product_data['discount_percent'] = int((diff / product_data['original_price']) * 100)
@@ -115,19 +100,16 @@ def add_product_via_link():
             product_url=url,
             real_deal_status=product_data.get('real_deal_status', 'normal')
         )
-        
         db.session.add(new_product)
         db.session.commit()
         
         history = PriceHistory(product_id=new_product.id, price=new_product.current_price)
         db.session.add(history)
         db.session.commit()
-        
         return jsonify({'message': '✅ Ürün başarıyla eklendi!', 'product': product_data}), 201
 
     except Exception as e:
-        print(f"❌ Hata: {e}")
-        return jsonify({'message': 'Sunucu hatası', 'error': str(e)}), 500
+        return jsonify({'message': 'Hata', 'error': str(e)}), 500
 
 @app.route('/api/products/<int:id>', methods=['DELETE'])
 def delete_product(id):
