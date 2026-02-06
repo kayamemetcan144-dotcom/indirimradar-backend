@@ -169,7 +169,8 @@ def home():
         'endpoints': {
             'auth': '/api/auth/login, /api/auth/register',
             'products': '/api/products',
-            'admin': '/api/admin/products'
+            'admin': '/api/admin/products',
+            'bot': '/api/bot/products'
         }
     })
 
@@ -481,6 +482,51 @@ def delete_product(product_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({'message': 'Error deleting product', 'error': str(e)}), 500
+
+# ==================== BOT ENTEGRASYONU ====================
+
+@app.route('/api/bot/products', methods=['POST'])
+def add_bot_product():
+    """Telegram botundan gelen hazır verileri kaydeder"""
+    try:
+        data = request.get_json()
+        
+        # 1. Veri Kontrolü
+        if not data or 'title' not in data or 'product_url' not in data:
+            return jsonify({'message': 'Eksik veri'}), 400
+
+        # 2. Duplicate Kontrolü (Aynı link var mı?)
+        existing = Product.query.filter_by(product_url=data['product_url']).first()
+        if existing:
+            return jsonify({'message': 'Bu ürün zaten var', 'id': existing.id}), 200
+
+        # 3. Ürünü Oluştur (Bot zaten her şeyi ayrıştırıp gönderiyor)
+        new_product = Product(
+            title=data.get('title', 'Başlık Yok'),
+            platform=data.get('platform', 'Diğer'),
+            category=data.get('category', 'Genel'),
+            current_price=data.get('current_price', 0),
+            original_price=data.get('original_price', 0),
+            discount_percent=data.get('discount_percent', 0),
+            image_url=data.get('image_url', ''),
+            product_url=data.get('product_url', ''),
+            real_deal_status=data.get('real_deal_status', 'normal')
+        )
+        
+        db.session.add(new_product)
+        db.session.commit()
+        
+        # Fiyat geçmişi
+        history = PriceHistory(product_id=new_product.id, price=new_product.current_price)
+        db.session.add(history)
+        db.session.commit()
+        
+        return jsonify({'message': '✅ Bot ürünü ekledi!', 'id': new_product.id}), 201
+
+    except Exception as e:
+        db.session.rollback()
+        print(f"Bot Ekleme Hatası: {e}")
+        return jsonify({'message': 'Sunucu hatası', 'error': str(e)}), 500
 
 # ==================== STATS ROUTE ====================
 
