@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>İndirimRadar - Akıllı Fırsat Platformu</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #FF6600;
+            --primary-dark: #e55d00;
+            --secondary: #1a1a2e;
+            --bg: #f8fafc;
+            --card-bg: #ffffff;
+            --text: #2d3748;
+            --text-light: #718096;
+            --border: #e2e8f0;
+            --shadow: 0 4px 12px rgba(0,0,0,0.08);
+            --shadow-hover: 0 8px 24px rgba(255,102,0,0.15);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+        }
+
+        /* Navbar */
+        .navbar {
+            background: var(--card-bg);
+            padding: 16px 5%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: var(--shadow);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+
+        .logo {
+            font-size: 1.75rem;
+            font-weight: 800;
+            color: var(--primary);
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .logo i {
+            font-size: 2rem;
+        }
+
+        .search-container {
+            flex: 1;
+            max-width: 550px;
+            margin: 0 30px;
+            position: relative;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 14px 20px 14px 50px;
+            border: 2px solid var(--border);
+            border-radius: 50px;
+            outline: none;
+            background: var(--bg);
+            font-size: 15px;
+            transition: all 0.3s;
+        }
+
+        .search-input:focus {
+            border-color: var(--primary);
+            background: var(--card-bg);
+            box-shadow: 0 0 0 4px rgba(255,102,0,0.1);
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 18px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-light);
+            font-size: 18px;
+        }
+
+        .nav-actions {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .nav-btn {
+            padding: 10px 20px;
+            background: var(--bg);
+            border: none;
+            border-radius: 25px;
+            color: var(--text);
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 14px;
+        }
+
+        .nav-btn:hover {
+            background: var(--primary);
+            color: white;
+            transform: translateY(-2px);
+        }
+
+        .nav-btn.admin {
+            background: var(--primary);
+            color: white;
+        }
+
+        /* Category Pills */
+        .category-scroll {
+            display: flex;
+            gap: 12px;
+            padding: 20px 5%;
+            overflow-x: auto;
+            background: var(--card-bg);
+            white-space: nowrap;
+            scrollbar-width: thin;
+            scrollbar-color: var(--primary) var(--bg);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .category-scroll::-webkit-scrollbar {
+            height: 6px;
+        }
+
+        .category-scroll::-webkit-scrollbar-thumb {
+            background: var(--primary);
+            border-radius: 10px;
+        }
+
+        .cat-btn {
+            padding: 10px 24px;
+            background: var(--bg);
+            border-radius: 25px;
+            color: var(--text);
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: 600;
+            font-size: 14px;
+            border: 2px solid transparent;
+        }
+
+        .cat-btn.active {
+            background: var(--primary);
+            color: white;
+            box-shadow: 0 4px 12px rgba(255,102,0,0.3);
+        }
+
+        .cat-btn:hover {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+            transform: translateY(-2px);
+        }
+
+        /* Stats Bar */
+        .stats-bar {
+            background: linear-gradient(135deg, var(--primary), #ff8533);
+            padding: 20px 5%;
+            display: flex;
+            justify-content: space-around;
+            color: white;
+            text-align: center;
+        }
+
+        .stat-item h3 {
+            font-size: 2rem;
+            font-weight: 800;
+            margin-bottom: 5px;
+        }
+
+        .stat-item p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        /* Products Grid */
+        .products-grid {
+            padding: 40px 5%;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 30px;
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        .product-card {
+            background: var(--card-bg);
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: var(--shadow);
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+
+        .product-card:hover {
+            transform: translateY(-8px);
+            box-shadow: var(--shadow-hover);
+        }
+
+        .badge {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+            color: white;
+            padding: 6px 12px;
+            border-radius: 10px;
+            font-weight: 700;
+            font-size: 14px;
+            box-shadow: 0 4px 12px rgba(239,68,68,0.4);
+            z-index: 10;
+        }
+
+        .card-img-container {
+            background: white;
+            padding: 25px;
+            height: 240px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .card-img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+
+        .card-body {
+            padding: 20px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .platform-tag {
+            display: inline-block;
+            padding: 4px 10px;
+            background: var(--bg);
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--primary);
+            margin-bottom: 10px;
+        }
+
+        .card-title {
+            font-weight: 600;
+            font-size: 15px;
+            margin-bottom: 15px;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            min-height: 2.8em;
+            color: var(--text);
+        }
+
+        .price-row {
+            margin-top: auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+        }
+
+        .price-group {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .old-price {
+            font-size: 13px;
+            text-decoration: line-through;
+            color: var(--text-light);
+        }
+
+        .current-price {
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: var(--primary);
+        }
+
+        .btn-go {
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            background: var(--primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            text-decoration: none;
+            transition: all 0.3s;
+            box-shadow: 0 4px 12px rgba(255,102,0,0.3);
+        }
+
+        .btn-go:hover {
+            background: var(--primary-dark);
+            transform: scale(1.1);
+            box-shadow: 0 6px 16px rgba(255,102,0,0.4);
+        }
+
+        .btn-go i {
+            font-size: 18px;
+        }
+
+        /* Loading */
+        .loading {
+            text-align: center;
+            padding: 60px;
+            color: var(--text-light);
+        }
+
+        .loading i {
+            font-size: 3rem;
+            color: var(--primary);
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 80px 20px;
+            color: var(--text-light);
+        }
+
+        .empty-state i {
+            font-size: 4rem;
+            color: var(--border);
+            margin-bottom: 20px;
+        }
+
+        .empty-state h3 {
+            font-size: 1.5rem;
+            color: var(--text);
+            margin-bottom: 10px;
+        }
+
+        /* Footer */
+        .footer {
+            background: var(--secondary);
+            color: white;
+            padding: 40px 5%;
+            text-align: center;
+            margin-top: 60px;
+        }
+
+        .footer p {
+            opacity: 0.8;
+            margin-bottom: 15px;
+        }
+
+        .footer-links {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin-top: 20px;
+        }
+
+        .footer-links a {
+            color: white;
+            text-decoration: none;
+            opacity: 0.7;
+            transition: opacity 0.3s;
+        }
+
+        .footer-links a:hover {
+            opacity: 1;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .navbar {
+                flex-wrap: wrap;
+                gap: 15px;
+            }
+
+            .search-container {
+                order: 3;
+                min-width: 100%;
+                margin: 0;
+            }
+
+            .stats-bar {
+                flex-direction: column;
+                gap: 20px;
+            }
+
+            .products-grid {
+                grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+                gap: 20px;
+                padding: 30px 4%;
+            }
+
+            .logo {
+                font-size: 1.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar">
+        <a href="/" class="logo">
+            <i class="fas fa-tags"></i>
+            <span>İndirimRadar</span>
+        </a>
+        <div class="search-container">
+            <i class="fas fa-search search-icon"></i>
+            <input type="text" class="search-input" id="searchInput" placeholder="Ürün, marka veya kategori ara..." onkeyup="filterProducts()">
+        </div>
+        <div class="nav-actions">
+            <button class="nav-btn admin" onclick="window.location.href='admin.html'">
+                <i class="fas fa-user-shield"></i> Admin
+            </button>
+        </div>
+    </nav>
+
+    <!-- Category Tabs -->
+    <div class="category-scroll">
+        <div class="cat-btn active" onclick="filterBy('all')">
+            <i class="fas fa-star"></i> Tümü
+        </div>
+        <div class="cat-btn" onclick="filterBy('Elektronik')">
+            <i class="fas fa-laptop"></i> Elektronik
+        </div>
+        <div class="cat-btn" onclick="filterBy('Moda')">
+            <i class="fas fa-tshirt"></i> Moda
+        </div>
+        <div class="cat-btn" onclick="filterBy('Ev')">
+            <i class="fas fa-home"></i> Ev & Yaşam
+        </div>
+        <div class="cat-btn" onclick="filterBy('Süpermarket')">
+            <i class="fas fa-shopping-cart"></i> Süpermarket
+        </div>
+        <div class="cat-btn" onclick="filterBy('Kozmetik')">
+            <i class="fas fa-spray-can"></i> Kozmetik
+        </div>
+    </div>
+
+    <!-- Stats Bar -->
+    <div class="stats-bar" id="statsBar" style="display:none;">
+        <div class="stat-item">
+            <h3 id="totalProducts">0</h3>
+            <p>Toplam Ürün</p>
+        </div>
+        <div class="stat-item">
+            <h3 id="avgDiscount">0%</h3>
+            <p>Ortalama İndirim</p>
+        </div>
+        <div class="stat-item">
+            <h3 id="bestDeal">0%</h3>
+            <p>En İyi Fırsat</p>
+        </div>
+    </div>
+
+    <!-- Products Grid -->
+    <div class="products-grid" id="products-container">
+        <div class="loading" style="grid-column: 1/-1;">
+            <i class="fas fa-circle-notch"></i>
+            <p style="margin-top: 20px;">Fırsatlar yükleniyor...</p>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+        <h3 style="margin-bottom: 15px;">🔥 İndirimRadar</h3>
+        <p>Akıllı alışverişin yeni adresi. En iyi fırsatları kaçırma!</p>
+        <div class="footer-links">
+            <a href="#">Hakkımızda</a>
+            <a href="#">İletişim</a>
+            <a href="#">Gizlilik</a>
+            <a href="admin.html">Admin</a>
+        </div>
+        <p style="margin-top: 30px; font-size: 13px;">© 2026 İndirimRadar. Tüm hakları saklıdır.</p>
+    </div>
+
+    <script>
+        const API_URL = "https://indirimradar-backend-production.up.railway.app";
+        let allProducts = [];
+
+        // Load products on page load
+        window.onload = async () => {
+            try {
+                const res = await fetch(`${API_URL}/api/products`);
+                const data = await res.json();
+                allProducts = data.products || [];
+                
+                // Update stats
+                updateStats(allProducts);
+                
+                // Render products
+                render(allProducts);
+            } catch(e) {
+                console.error('Error loading products:', e);
+                document.getElementById('products-container').innerHTML = `
+                    <div class="empty-state" style="grid-column: 1/-1;">
+                        <i class="fas fa-exclamation-circle"></i>
+                        <h3>Bağlantı Hatası</h3>
+                        <p>Ürünler yüklenirken bir hata oluştu. Lütfen sayfayı yenileyin.</p>
+                    </div>
+                `;
+            }
+        };
+
+        // Update statistics
+        function updateStats(products) {
+            if (products.length === 0) return;
+            
+            const totalProducts = products.length;
+            const avgDiscount = Math.round(
+                products.reduce((sum, p) => sum + p.discount_percent, 0) / totalProducts
+            );
+            const bestDeal = Math.max(...products.map(p => p.discount_percent));
+            
+            document.getElementById('totalProducts').textContent = totalProducts;
+            document.getElementById('avgDiscount').textContent = avgDiscount + '%';
+            document.getElementById('bestDeal').textContent = bestDeal + '%';
+            document.getElementById('statsBar').style.display = 'flex';
+        }
+
+        // Render products
+        function render(list) {
+            const container = document.getElementById('products-container');
+            container.innerHTML = '';
+            
+            if(list.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state" style="grid-column: 1/-1;">
+                        <i class="fas fa-inbox"></i>
+                        <h3>Ürün Bulunamadı</h3>
+                        <p>Aradığınız kriterlere uygun ürün bulunamadı.</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            list.forEach(p => {
+                const badge = p.discount_percent > 0 ? `<div class="badge">%${p.discount_percent}</div>` : '';
+                const oldPrice = p.original_price > p.current_price ? `<div class="old-price">${p.original_price.toLocaleString('tr-TR')} ₺</div>` : '';
+                
+                container.innerHTML += `
+                    <div class="product-card">
+                        ${badge}
+                        <div class="card-img-container">
+                            <img src="${p.image_url || p.image}" class="card-img" onerror="this.src='https://via.placeholder.com/300/FF6600/FFFFFF?text=Ürün+Görseli'" alt="${p.title}">
+                        </div>
+                        <div class="card-body">
+                            <div class="platform-tag">
+                                <i class="fas fa-store"></i> ${p.platform}
+                            </div>
+                            <div class="card-title">${p.title}</div>
+                            <div class="price-row">
+                                <div class="price-group">
+                                    ${oldPrice}
+                                    <div class="current-price">${p.current_price.toLocaleString('tr-TR')} ₺</div>
+                                </div>
+                                <a href="${p.product_url || p.url}" target="_blank" class="btn-go" title="Ürüne Git">
+                                    <i class="fas fa-arrow-right"></i>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        // Search filter
+        function filterProducts() {
+            const term = document.getElementById('searchInput').value.toLowerCase().trim();
+            const filtered = allProducts.filter(p => 
+                p.title.toLowerCase().includes(term) ||
+                p.platform.toLowerCase().includes(term) ||
+                p.category.toLowerCase().includes(term)
+            );
+            render(filtered);
+        }
+
+        // Category filter
+        function filterBy(cat) {
+            // Update active button
+            document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('active'));
+            event.target.closest('.cat-btn').classList.add('active');
+            
+            // Filter products
+            const filtered = cat === 'all' 
+                ? allProducts 
+                : allProducts.filter(p => 
+                    p.category.toLowerCase().includes(cat.toLowerCase())
+                );
+            
+            render(filtered);
+        }
+    </script>
+</body>
+</html>
