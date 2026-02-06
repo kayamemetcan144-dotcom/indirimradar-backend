@@ -14,7 +14,6 @@ class ProductScraper:
 
     def setup_selenium(self):
         print("🕵️‍♂️ Chrome başlatılıyor...")
-        # Railway ve Local yolları
         chrome_path = shutil.which("chromium") or shutil.which("google-chrome") or "/usr/bin/chromium"
         driver_path = shutil.which("chromedriver") or "/usr/bin/chromedriver"
         
@@ -24,7 +23,6 @@ class ProductScraper:
         chrome_options = Options()
         if self.headless: chrome_options.add_argument('--headless')
         
-        # Bot engellerini aşmak için kritik ayarlar
         chrome_options.add_argument('--no-sandbox')
         chrome_options.add_argument('--disable-dev-shm-usage')
         chrome_options.add_argument('--disable-gpu')
@@ -44,96 +42,97 @@ class ProductScraper:
     def scrape_single_product(self, url):
         print(f"🔗 İnceleniyor: {url}")
         driver = self.setup_selenium()
-        product_data = None
         
+        # Varsayılan Değerler
+        product_data = {
+            'title': 'Ürün Başlığı Bulunamadı',
+            'current_price': 0.0,
+            'original_price': 0.0,
+            'discount_percent': 0,
+            'image_url': '',
+            'product_url': url,
+            'platform': 'Hepsiburada',
+            'category': 'Genel'
+        }
+
         try:
             driver.get(url)
-            time.sleep(3) # Sayfa otursun
+            time.sleep(5) # Sayfanın tam yüklenmesi için bekle
             soup = BeautifulSoup(driver.page_source, 'html.parser')
             
-            # --- 1. HEPSİBURADA FİYAT (Nokta Atışı) ---
-            current_price = 0.0
-            original_price = 0.0
-            
-            # A) Güncel Fiyat (Yeşil/Büyük Olan)
-            # Hepsiburada'nın kullandığı net etiket: 'price-current-price'
-            price_box = soup.find(['div', 'span'], {'data-test-id': 'price-current-price'})
-            if price_box:
-                current_price = self.parse_price(price_box.text)
-                print(f"✅ Güncel Fiyat Bulundu: {current_price}")
-            
-            # B) Eski Fiyat (Üstü Çizili Olan)
-            old_price_box = soup.find(['div', 'span'], {'data-test-id': 'price-old-price'})
-            if old_price_box:
-                original_price = self.parse_price(old_price_box.text)
-                print(f"✅ Eski Fiyat Bulundu: {original_price}")
+            # === YÖNTEM 1: JSON-LD (Google Verisi - En Güvenilir) ===
+            # Sayfanın arkasındaki gizli kimlik kartını okuyoruz.
+            scripts = soup.find_all('script', type='application/ld+json')
+            for script in scripts:
+                try:
+                    data = json.loads(script.text)
+                    if isinstance(data, list): data = data[0] # Bazen liste içinde gelir
+                    
+                    # Eğer bu bir Ürün verisiyse
+                    if data.get('@type') == 'Product':
+                        print("✅ Resmi Ürün Verisi (JSON-LD) Bulundu!")
+                        
+                        # 1. Başlık
+                        if 'name' in data: 
+                            product_data['title'] = data['name']
+                        
+                        # 2. Resim (Liste veya tek link olabilir)
+                        if 'image' in data:
+                            imgs = data['image']
+                            if isinstance(imgs, list) and len(imgs) > 0:
+                                product_data['image_url'] = imgs[0]
+                            elif isinstance(imgs, str):
+                                product_data['image_url'] = imgs
 
-            # --- 2. YEDEK PLAN (Eğer Site Tasarımı Değişmişse) ---
-            if current_price == 0:
-                print("⚠️ Etiketle bulunamadı, JSON verisine bakılıyor...")
-                # Hepsiburada sayfa içinde 'productModel' adında bir JSON tutar
-                scripts = soup.find_all('script')
-                for script in scripts:
-                    if 'currentPrice' in script.text:
-                        try:
-                            # Regex ile json içindeki fiyatı cımbızla çek
-                            cp_match = re.search(r'"currentPrice"\s*:\s*([\d\.]+)', script.text)
-                            if cp_match: current_price = float(cp_match.group(1))
+                        # 3. Fiyat (Offers içinde olur)
+                        if 'offers' in data:
+                            offer = data['offers']
+                            if isinstance(offer, list): offer = offer[0] # İlk teklifi al
                             
-                            op_match = re.search(r'"originalPrice"\s*:\s*([\d\.]+)', script.text)
-                            if op_match: original_price = float(op_match.group(1))
-                            
-                            if current_price > 0: break
-                        except: pass
+                            price = str(offer.get('price', 0))
+                            product_data['current_price'] = float(price)
+                            # JSON-LD genelde sadece satış fiyatını verir, eski fiyatı vermez.
+                            # O yüzden şimdilik eski fiyat = yeni fiyat yapalım, aşağıda düzelteceğiz.
+                            product_data['original_price'] = product_data['current_price']
+                        
+                        break # Veriyi bulduk, döngüden çık
+                except:
+                    continue
 
-            # --- MANTIK KONTROLLERİ ---
-            # Eğer eski fiyat yoksa veya yenisinden düşükse (Hata varsa), eşitle.
-            if original_price == 0 or original_price < current_price:
-                original_price = current_price
-
-            # Taksit tutarını (örn: 14.90) yanlışlıkla fiyat sanmamak için kontrol
-            # Ürün fiyatı genelde 15-20 TL altı olmaz (mendil bile olsa kargo vs 50+ olur)
-            # Ama biz yine de etiket bulduysak ona güveniriz.
-
-            # --- 3. İNDİRİM HESAPLAMA ---
-            discount_percent = 0
-            if original_price > current_price:
-                diff = original_price - current_price
-                discount_percent = int((diff / original_price) * 100)
-
-            # --- 4. RESİM BULMA ---
-            image_url = ""
-            # A) Büyük Resim (Carousel içinden)
-            img_box = soup.find('img', {'class': 'product-image'})
-            if img_box: image_url = img_box.get('src')
+            # === YÖNTEM 2: EKSİK VERİLERİ TAMAMLAMA (HTML'den) ===
             
-            # B) Yedek Resim
-            if not image_url:
-                og_img = soup.find("meta", property="og:image")
-                if og_img: image_url = og_img["content"]
+            # Eğer resim JSON'dan gelmediyse HTML'den al
+            if not product_data['image_url']:
+                img = soup.find('img', {'class': 'product-image'})
+                if img: product_data['image_url'] = img.get('src')
+            
+            # Eğer Başlık gelmediyse
+            if product_data['title'] == 'Ürün Başlığı Bulunamadı':
+                h1 = soup.find('h1', {'id': 'product-name'})
+                if h1: product_data['title'] = h1.text.strip()
 
-            # --- 5. BAŞLIK ---
-            title = "Ürün Başlığı"
-            h1 = soup.find('h1', {'id': 'product-name'})
-            if h1: 
-                title = h1.text.strip()
-            elif soup.title:
-                title = soup.title.text.strip()
+            # === YÖNTEM 3: ESKİ FİYAT VE İNDİRİM (HTML'den Kontrol) ===
+            # JSON-LD sadece "64.99" der. "89.99" demez. Onu HTML'den bulacağız.
+            
+            # HTML'deki "Eski Fiyat" etiketine bak
+            old_price_html = soup.find(['div', 'span', 'del'], {'data-test-id': 'price-old-price'})
+            
+            if old_price_html:
+                old_val = self.parse_price(old_price_html.text)
+                if old_val > product_data['current_price']:
+                    product_data['original_price'] = old_val
+                    print(f"✅ Eski Fiyat HTML'den Bulundu: {old_val}")
 
-            # Verileri Paketle
-            product_data = {
-                'title': title,
-                'current_price': current_price,
-                'original_price': original_price,
-                'discount_percent': discount_percent,
-                'image_url': image_url,
-                'product_url': url,
-                'platform': 'Hepsiburada',
-                'category': 'Genel'
-            }
-                
+            # İndirim Hesapla
+            if product_data['original_price'] > product_data['current_price']:
+                diff = product_data['original_price'] - product_data['current_price']
+                product_data['discount_percent'] = int((diff / product_data['original_price']) * 100)
+
+            # Temizlik
+            product_data['title'] = product_data['title'].strip()
+
         except Exception as e:
-            print(f"❌ Hata: {e}")
+            print(f"❌ Hata oluştu: {e}")
         finally:
             driver.quit()
             
@@ -141,9 +140,9 @@ class ProductScraper:
 
     def parse_price(self, text):
         if not text: return 0.0
-        # "64,99 TL" -> 64.99
-        text = str(text).replace('TL', '').strip()
-        # 1.250,00 formatı için
+        # "89,99 TL" -> 89.99
+        text = str(text).replace('TL', '').replace('tl', '').strip()
+        # 1.250,50 -> 1250.50
         clean = text.replace('.', '').replace(',', '.')
         try:
             return float(clean)
