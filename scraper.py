@@ -31,24 +31,34 @@ class ProductScraper:
         self.session.headers.update(self.headers)
     
     def setup_selenium(self):
-        """Selenium WebDriver kurulumu - Güçlendirilmiş Ayarlar"""
+        """Selenium WebDriver kurulumu - Railway Uyumlu"""
         chrome_options = Options()
         if self.headless:
             chrome_options.add_argument('--headless')
         
-        # Bot algılamayı aşmak için kritik ayarlar
         chrome_options.add_argument('--no-sandbox')
         chrome_options.add_argument('--disable-dev-shm-usage')
+        chrome_options.add_argument('--disable-gpu')
         chrome_options.add_argument('--disable-blink-features=AutomationControlled')
-        chrome_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
-        chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
-        chrome_options.add_experimental_option('useAutomationExtension', False)
         
-        driver = webdriver.Chrome(options=chrome_options)
+        # --- KRİTİK AYAR: Railway'deki Chrome'u bul ---
+        import os
+        # Railway üzerinde Chromium genelde bu yollarda olur, sırayla deneyelim
+        chrome_bin = os.popen("which chromium").read().strip() or "/usr/bin/chromium"
+        chromedriver_bin = os.popen("which chromedriver").read().strip() or "/usr/bin/chromedriver"
+
+        chrome_options.binary_location = chrome_bin
+        
+        # WebDriver servisini sistemdeki chromedriver ile başlat
+        from selenium.webdriver.chrome.service import Service
+        service = Service(executable_path=chromedriver_bin)
+
+        driver = webdriver.Chrome(service=service, options=chrome_options)
+        
         # WebDriver olduğunu gizle
         driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
         return driver
-
+        
     # ==================== YENİ: TEK ÜRÜN ÇEKME (LINK İLE) ====================
     def scrape_single_product(self, url):
         """
