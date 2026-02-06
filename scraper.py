@@ -7,31 +7,31 @@ from datetime import datetime
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
-# Fake UserAgent ekledik (Yoksa standart headers kullanacağız)
-try:
-    from fake_useragent import UserAgent
-except ImportError:
-    UserAgent = None
+import shutil
 
 class ProductScraper:
-    """
-    Web scraping sınıfı - Hem toplu tarama hem de tekil ürün ekleme için güncellendi.
-    """
-    
     def __init__(self, headless=True):
         self.headless = headless
         self.session = requests.Session()
-        # Robot gibi görünmemek için tarayıcı kimliği
         self.headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-            'Accept-Language': 'tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7',
-            'Referer': 'https://www.google.com/'
+            'Accept-Language': 'tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7'
         }
-        self.session.headers.update(self.headers)
-    
+
     def setup_selenium(self):
-        """Selenium WebDriver kurulumu - Railway Uyumlu"""
+        print("🕵️‍♂️ Chrome ve Driver aranıyor...")
+        chrome_path = shutil.which("chromium") or shutil.which("google-chrome") or "/usr/bin/chromium"
+        driver_path = shutil.which("chromedriver") or "/usr/bin/chromedriver"
+        
+        # Eğer sistemde bulamazsa (Railway ortam değişkenlerini dene)
+        import os
+        if not os.path.exists(chrome_path):
+             chrome_path = os.environ.get("CHROME_BIN", "/usr/bin/chromium")
+        if not os.path.exists(driver_path):
+             driver_path = os.environ.get("CHROMEDRIVER_PATH", "/usr/bin/chromedriver")
+
+        print(f"📍 Kullanılan Chrome: {chrome_path}")
+
         chrome_options = Options()
         if self.headless:
             chrome_options.add_argument('--headless')
@@ -39,151 +39,163 @@ class ProductScraper:
         chrome_options.add_argument('--no-sandbox')
         chrome_options.add_argument('--disable-dev-shm-usage')
         chrome_options.add_argument('--disable-gpu')
-        chrome_options.add_argument('--disable-blink-features=AutomationControlled')
-        
-        # --- KRİTİK AYAR: Railway'deki Chrome'u bul ---
-        import os
-        # Railway üzerinde Chromium genelde bu yollarda olur, sırayla deneyelim
-        chrome_bin = os.popen("which chromium").read().strip() or "/usr/bin/chromium"
-        chromedriver_bin = os.popen("which chromedriver").read().strip() or "/usr/bin/chromedriver"
+        chrome_options.add_argument('--window-size=1920,1080') # Tam ekran aç ki öğeler gizlenmesin
+        chrome_options.binary_location = chrome_path
 
-        chrome_options.binary_location = chrome_bin
-        
-        # WebDriver servisini sistemdeki chromedriver ile başlat
         from selenium.webdriver.chrome.service import Service
-        service = Service(executable_path=chromedriver_bin)
+        try:
+            service = Service(executable_path=driver_path)
+            driver = webdriver.Chrome(service=service, options=chrome_options)
+            return driver
+        except Exception as e:
+            print(f"❌ Driver hatası: {str(e)}")
+            raise e
 
-        driver = webdriver.Chrome(service=service, options=chrome_options)
-        
-        # WebDriver olduğunu gizle
-        driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
-        return driver
-        
-    # ==================== YENİ: TEK ÜRÜN ÇEKME (LINK İLE) ====================
     def scrape_single_product(self, url):
-        """
-        Verilen tek bir ürün linkine gider ve detaylarını çeker.
-        Selenium kullanır çünkü Hepsiburada/Trendyol requests'i engeller.
-        """
-        print(f"🕵️‍♂️ Ürün analizi başlıyor: {url}")
+        print(f"🔗 Linke gidiliyor: {url}")
         driver = self.setup_selenium()
-        
         product_data = None
         
         try:
             driver.get(url)
-            time.sleep(3) # Sayfanın yüklenmesini bekle
+            time.sleep(5) # Sayfanın tam yüklenmesini bekle
             
-            # Platforma göre ayrıştır
+            # Sayfa kaynağını al ve BeautifulSoup ile işle
+            soup = BeautifulSoup(driver.page_source, 'html.parser')
+            
             if "trendyol.com" in url:
-                product_data = self._parse_trendyol_detail(driver, url)
+                product_data = self._parse_trendyol_detail(soup, url)
             elif "hepsiburada.com" in url:
-                product_data = self._parse_hepsiburada_detail(driver, url)
-            elif "n11.com" in url:
-                product_data = self._parse_n11_detail(driver, url)
+                product_data = self._parse_hepsiburada_detail(soup, url)
             else:
-                # Bilinmeyen site ise genel meta taglardan çekmeyi dene
-                product_data = self._parse_generic_detail(driver, url)
+                product_data = self._parse_generic_detail(soup, url)
                 
         except Exception as e:
-            print(f"❌ Ürün çekme hatası: {e}")
+            print(f"❌ Beklenmedik hata: {e}")
         finally:
             driver.quit()
             
         return product_data
 
-    # --- Yardımcı Parse Fonksiyonları ---
-    
-    def _parse_trendyol_detail(self, driver, url):
-        soup = BeautifulSoup(driver.page_source, 'html.parser')
-        title = soup.find('h1', class_='pr-new-br').text.strip() if soup.find('h1', class_='pr-new-br') else "Başlık Bulunamadı"
+    # --- HEPSİBURADA (GÜNCELLENDİ: JSON-LD YÖNTEMİ) ---
+    def _parse_hepsiburada_detail(self, soup, url):
+        print("🛒 Hepsiburada analizi yapılıyor...")
         
-        price_container = soup.find('span', class_='prc-dsc')
-        current_price = self.parse_price(price_container.text) if price_container else 0.0
+        title = "Ürün Başlığı Bulunamadı"
+        current_price = 0.0
+        original_price = 0.0
+        image_url = ""
         
-        img_tag = soup.find('img', class_='base-product-image') # Bu değişebilir
-        if not img_tag:
-             # Alternatif resim bulucu
-             img_tag = soup.select_one('.product-slide-container img')
-             
-        image_url = img_tag['src'] if img_tag else ""
-        
+        # 1. YÖNTEM: JSON-LD (En Güvenilir)
+        # Hepsiburada ürün bilgilerini sayfanın içinde gizli bir JSON paketinde tutar.
+        try:
+            scripts = soup.find_all('script', type='application/ld+json')
+            for script in scripts:
+                try:
+                    data = json.loads(script.text)
+                    # Bazen liste döner, bazen sözlük
+                    if isinstance(data, list):
+                        data = data[0]
+                    
+                    if data.get('@type') == 'Product':
+                        title = data.get('name', title)
+                        image_url = data.get('image', "")
+                        
+                        offers = data.get('offers', {})
+                        price = str(offers.get('price', 0))
+                        current_price = float(price.replace(',', '.'))
+                        original_price = current_price # Hepsiburada JSON'da eski fiyatı vermeyebilir
+                        print("✅ JSON-LD verisi okundu!")
+                        break
+                except:
+                    continue
+        except Exception as e:
+            print(f"⚠️ JSON okuma hatası: {e}")
+
+        # 2. YÖNTEM: HTML Selector (Yedek Plan)
+        # Eğer JSON boş geldiyse veya fiyat 0 ise HTML'den çekmeyi dene
+        if current_price == 0:
+            print("⚠️ HTML taramasına geçiliyor...")
+            
+            # Başlık
+            h1 = soup.find('h1', {'id': 'product-name'})
+            if h1: title = h1.text.strip()
+            
+            # Fiyat (Çeşitli ihtimaller)
+            price_elem = soup.find('span', {'data-test-id': 'price-current-price'}) # Masaüstü
+            if not price_elem:
+                price_elem = soup.find('div', {'class': 'price-value'}) # Mobil
+            
+            if price_elem:
+                current_price = self.parse_price(price_elem.text)
+            
+            # Eski Fiyat
+            old_price_elem = soup.find('span', {'data-test-id': 'price-old-price'})
+            if old_price_elem:
+                original_price = self.parse_price(old_price_elem.text)
+            else:
+                original_price = current_price
+            
+            # Resim
+            if not image_url:
+                img = soup.find('img', {'class': 'product-image'})
+                if img: image_url = img.get('src')
+
+        # İndirim Oranı Hesapla
+        discount = 0
+        if original_price > current_price:
+            discount = int(((original_price - current_price) / original_price) * 100)
+
         return {
             'title': title,
             'current_price': current_price,
-            'original_price': current_price, # İndirimsiz halini bulamazsa aynısını yaz
+            'original_price': original_price,
+            'discount_percent': discount,
+            'image_url': image_url,
+            'product_url': url,
+            'platform': 'Hepsiburada',
+            'category': 'Elektronik' # Otomatik kategori eklenebilir
+        }
+
+    # --- TRENDYOL (GÜNCELLENDİ) ---
+    def _parse_trendyol_detail(self, soup, url):
+        print("🛒 Trendyol analizi yapılıyor...")
+        title = "Trendyol Ürünü"
+        current_price = 0.0
+        image_url = ""
+        
+        # Başlık
+        h1 = soup.find('h1', class_='pr-new-br')
+        if h1: title = h1.text.strip()
+        
+        # Fiyat
+        price_span = soup.find('span', class_='prc-dsc')
+        if price_span: current_price = self.parse_price(price_span.text)
+        
+        # Resim
+        img_box = soup.find('div', class_='gallery-container')
+        if img_box:
+            img = img_box.find('img')
+            if img: image_url = img.get('src')
+            
+        return {
+            'title': title,
+            'current_price': current_price,
+            'original_price': current_price,
             'discount_percent': 0,
             'image_url': image_url,
             'product_url': url,
             'platform': 'Trendyol',
-            'category': self.detect_category(title)
+            'category': 'Diğer'
         }
 
-    def _parse_hepsiburada_detail(self, driver, url):
-        soup = BeautifulSoup(driver.page_source, 'html.parser')
+    def _parse_generic_detail(self, soup, url):
+        # Genel site (Meta taglardan oku)
+        title = soup.title.string if soup.title else "Ürün"
         
-        # Hepsiburada ID ile veri saklar
-        title = soup.find('h1', {'id': 'product-name'}).text.strip() if soup.find('h1', {'id': 'product-name'}) else "Ürün"
+        og_image = soup.find('meta', property='og:image')
+        image_url = og_image['content'] if og_image else ""
         
-        # Fiyat (Bazen markup değişir)
-        price_span = soup.find('span', {'data-bind': "markupText:'currentPriceBeforePoint'"})
-        if not price_span:
-            # Yeni tasarımda farklı olabilir, meta tagdan deneyelim
-            price_content = soup.find('span', content=True, itemprop='price')
-            current_price = float(price_content['content']) if price_content else 0.0
-        else:
-            current_price = self.parse_price(price_span.text)
-
-        # Resim
-        img_tag = soup.find('img', class_='product-image')
-        if not img_tag:
-             img_tag = soup.select_one('#productDetailsCarousel img')
-             
-        image_url = img_tag['src'] if img_tag else ""
-
-        return {
-            'title': title,
-            'current_price': current_price,
-            'original_price': current_price,
-            'discount_percent': 0,
-            'image_url': image_url,
-            'product_url': url,
-            'platform': 'Hepsiburada',
-            'category': self.detect_category(title)
-        }
-
-    def _parse_n11_detail(self, driver, url):
-        # N11 requests ile de çalışabilir ama Selenium garanti
-        soup = BeautifulSoup(driver.page_source, 'html.parser')
-        title = soup.find('h1', class_='proName').text.strip() if soup.find('h1', class_='proName') else "Ürün"
-        
-        price_tag = soup.find('div', class_='newPrice')
-        current_price = self.parse_price(price_tag.ins.text) if price_tag and price_tag.ins else 0.0
-        
-        img_tag = soup.find('div', class_='imgObj').find('a')['href'] if soup.find('div', class_='imgObj') else ""
-        
-        return {
-            'title': title,
-            'current_price': current_price,
-            'original_price': current_price,
-            'discount_percent': 0,
-            'image_url': img_tag,
-            'product_url': url,
-            'platform': 'N11',
-            'category': self.detect_category(title)
-        }
-
-    def _parse_generic_detail(self, driver, url):
-        # Bilinmeyen site için Meta Tagları kullan
-        soup = BeautifulSoup(driver.page_source, 'html.parser')
-        
-        og_title = soup.find("meta", property="og:title")
-        title = og_title["content"] if og_title else driver.title
-        
-        og_image = soup.find("meta", property="og:image")
-        image_url = og_image["content"] if og_image else ""
-        
-        # Fiyat bulmak zordur, 0 döneceğiz, kullanıcı elle girebilir
         return {
             'title': title,
             'current_price': 0.0,
@@ -191,33 +203,16 @@ class ProductScraper:
             'discount_percent': 0,
             'image_url': image_url,
             'product_url': url,
-            'platform': 'Other',
+            'platform': 'Diğer',
             'category': 'Diğer'
         }
 
-    # ==================== MEVCUT KATEGORİ SCRAPERLARI (DOKUNMADIM) ====================
-    
-    def scrape_trendyol_category(self, category_url, max_products=50):
-        # (Eski kodun aynısı buraya gelecek, yer kaplamaması için kısaltıyorum)
-        # ... Eski scrape_trendyol_category içeriği ...
-        return [] # Yer tutucu, sen silme, eski kod kalsın
-
-    # (Diğer fonksiyonlar: parse_price, detect_category vs. aynen kalsın)
-    def parse_price(self, price_text):
-        if not price_text: return 0.0
-        price_text = re.sub(r'[^\d,.]', '', str(price_text))
-        price_text = price_text.replace('.', '').replace(',', '.')
+    def parse_price(self, text):
+        if not text: return 0.0
+        # "12.345,67 TL" formatını "12345.67" float'a çevirir
+        clean = re.sub(r'[^\d,]', '', text) # Sadece rakam ve virgül kalsın
+        clean = clean.replace(',', '.') # Virgülü noktaya çevir
         try:
-            return float(price_text)
+            return float(clean)
         except:
             return 0.0
-    
-    def detect_category(self, title):
-        title_lower = title.lower()
-        if any(w in title_lower for w in ['iphone', 'samsung', 'xiaomi', 'bilgisayar', 'kulaklık']): return 'Elektronik'
-        return 'Diğer'
-
-    def calculate_real_deal(self, cp, op, d):
-        return 'normal'
-
-    # (Toplu tarama fonksiyonlarını da koru)
