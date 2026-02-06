@@ -8,33 +8,31 @@ from sqlalchemy import text
 import jwt
 import os
 
+# --- YENİ EKLENEN: Scraper'ı çağırıyoruz ---
+from scraper import ProductScraper 
+
 app = Flask(__name__)
 
-# CORS Configuration - Allow specific origins
-allowed_origins = os.getenv('ALLOWED_ORIGINS', 'http://localhost:8000').split(',')
-CORS(app, origins=allowed_origins)
+# CORS Configuration
+allowed_origins = os.getenv('ALLOWED_ORIGINS', '*').split(',')
+CORS(app, resources={r"/api/*": {"origins": "*"}}) # Tüm kapıları açtık (Garanti olsun)
 
-# Configuration - Use environment variables
+# Configuration
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production')
 app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', app.config['SECRET_KEY'])
 
-# Database Configuration - Support both SQLite (dev) and PostgreSQL (production)
+# Database Configuration
 database_url = os.getenv('DATABASE_URL', 'sqlite:///indirimradar.db')
-
-# Fix for Railway PostgreSQL URL (postgres:// -> postgresql://)
 if database_url.startswith('postgres://'):
     database_url = database_url.replace('postgres://', 'postgresql://', 1)
 
 app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-    'pool_pre_ping': True,
-    'pool_recycle': 300,
-}
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {'pool_pre_ping': True, 'pool_recycle': 300}
 
 db = SQLAlchemy(app)
 
-# ==================== MODELS ====================
+# ==================== MODELS (Aynı Kalıyor) ====================
 
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -56,7 +54,7 @@ class Product(db.Model):
     discount_percent = db.Column(db.Integer, nullable=False)
     image_url = db.Column(db.String(1000), nullable=False)
     product_url = db.Column(db.String(1000), nullable=False)
-    real_deal_status = db.Column(db.String(20), default='normal')  # real, normal, fake
+    real_deal_status = db.Column(db.String(20), default='normal')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     price_history = db.relationship('PriceHistory', backref='product', lazy=True)
@@ -87,35 +85,20 @@ def token_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
         token = request.headers.get('Authorization')
-        
-        if not token:
-            return jsonify({'message': 'Token is missing'}), 401
-        
+        if not token: return jsonify({'message': 'Token is missing'}), 401
         try:
             token = token.replace('Bearer ', '')
             data = jwt.decode(token, app.config['SECRET_KEY'], algorithms=["HS256"])
             current_user = User.query.get(data['user_id'])
-            
-            # CRITICAL: Kullanıcı veritabanından silinmişse engelle
-            if not current_user:
-                return jsonify({'message': 'User no longer exists'}), 401
-                
-        except jwt.ExpiredSignatureError:
-            return jsonify({'message': 'Token has expired, please login again'}), 401
-        except jwt.InvalidTokenError:
-            return jsonify({'message': 'Token is invalid'}), 401
-        except Exception as e:
-            return jsonify({'message': 'Authentication error', 'error': str(e)}), 401
-        
+            if not current_user: return jsonify({'message': 'User no longer exists'}), 401
+        except Exception as e: return jsonify({'message': 'Auth error', 'error': str(e)}), 401
         return f(current_user, *args, **kwargs)
-    
     return decorated
 
 def admin_required(f):
     @wraps(f)
     def decorated(current_user, *args, **kwargs):
-        if not current_user.is_admin:
-            return jsonify({'message': 'Admin privileges required'}), 403
+        if not current_user.is_admin: return jsonify({'message': 'Admin required'}), 403
         return f(current_user, *args, **kwargs)
     return decorated
 
@@ -125,444 +108,132 @@ def admin_required(f):
 def register():
     try:
         data = request.get_json()
-        
-        # Input validation
-        if not data:
-            return jsonify({'message': 'No data provided'}), 400
-        
-        if 'email' not in data or 'password' not in data:
+        if not data or 'email' not in data or 'password' not in data:
             return jsonify({'message': 'Email and password required'}), 400
         
         email = data['email'].strip().lower()
-        password = data['password']
-        
-        # Email validation
-        if '@' not in email or '.' not in email:
-            return jsonify({'message': 'Invalid email format'}), 400
-        
-        # Password validation
-        if len(password) < 6:
-            return jsonify({'message': 'Password must be at least 6 characters'}), 400
-        
         if User.query.filter_by(email=email).first():
             return jsonify({'message': 'User already exists'}), 400
         
-        new_user = User(
-            email=email,
-            password=generate_password_hash(password, method='pbkdf2:sha256')
-        )
-        
+        new_user = User(email=email, password=generate_password_hash(data['password'], method='pbkdf2:sha256'))
         db.session.add(new_user)
         db.session.commit()
         
-        token = jwt.encode({
-            'user_id': new_user.id,
-            'exp': datetime.utcnow() + timedelta(days=30)
-        }, app.config['SECRET_KEY'], algorithm="HS256")
-        
-        return jsonify({
-            'token': token,
-            'user': {
-                'id': new_user.id,
-                'email': new_user.email,
-                'is_premium': new_user.is_premium,
-                'is_admin': new_user.is_admin
-            }
-        }), 201
-    
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'message': 'Registration failed', 'error': str(e)}), 500
+        token = jwt.encode({'user_id': new_user.id, 'exp': datetime.utcnow() + timedelta(days=30)}, app.config['SECRET_KEY'], algorithm="HS256")
+        return jsonify({'token': token, 'user': {'id': new_user.id, 'email': new_user.email}}), 201
+    except Exception as e: return jsonify({'message': 'Error', 'error': str(e)}), 500
 
 @app.route('/api/auth/login', methods=['POST'])
 def login():
     try:
         data = request.get_json()
+        if not data or 'email' not in data or 'password' not in data: return jsonify({'message': 'Missing data'}), 400
         
-        # Input validation
-        if not data:
-            return jsonify({'message': 'No data provided'}), 400
-        
-        if 'email' not in data or 'password' not in data:
-            return jsonify({'message': 'Email and password required'}), 400
-        
-        email = data['email'].strip().lower()
-        user = User.query.filter_by(email=email).first()
-        
-        if not user:
+        user = User.query.filter_by(email=data['email'].strip().lower()).first()
+        if not user or not check_password_hash(user.password, data['password']):
             return jsonify({'message': 'Invalid credentials'}), 401
         
-        if not check_password_hash(user.password, data['password']):
-            return jsonify({'message': 'Invalid credentials'}), 401
-        
-        token = jwt.encode({
-            'user_id': user.id,
-            'exp': datetime.utcnow() + timedelta(days=30)
-        }, app.config['SECRET_KEY'], algorithm="HS256")
-        
-        return jsonify({
-            'token': token,
-            'user': {
-                'id': user.id,
-                'email': user.email,
-                'is_premium': user.is_premium,
-                'is_admin': user.is_admin
-            }
-        })
-    
-    except Exception as e:
-        return jsonify({'message': 'Login failed', 'error': str(e)}), 500
+        token = jwt.encode({'user_id': user.id, 'exp': datetime.utcnow() + timedelta(days=30)}, app.config['SECRET_KEY'], algorithm="HS256")
+        return jsonify({'token': token, 'user': {'id': user.id, 'email': user.email, 'is_admin': user.is_admin}})
+    except Exception as e: return jsonify({'message': 'Error', 'error': str(e)}), 500
 
-# ==================== PRODUCT ROUTES ====================
+# ==================== PRODUCT ROUTES (GÜNCELLENDİ) ====================
 
+# 1. GET Products (Listeleme)
 @app.route('/api/products', methods=['GET'])
 def get_products():
-    category = request.args.get('category')
-    platform = request.args.get('platform')
     page = int(request.args.get('page', 1))
-    per_page = int(request.args.get('per_page', 20))
-    
-    query = Product.query
-    
-    if category and category != 'Tümü':
-        query = query.filter_by(category=category)
-    
-    if platform:
-        query = query.filter_by(platform=platform)
-    
-    # Order by discount percent descending
-    query = query.order_by(Product.discount_percent.desc())
-    
-    products = query.paginate(page=page, per_page=per_page, error_out=False)
+    products = Product.query.order_by(Product.id.desc()).paginate(page=page, per_page=20, error_out=False)
     
     return jsonify({
         'products': [{
             'id': p.id,
             'title': p.title,
             'platform': p.platform,
-            'category': p.category,
-            'oldPrice': p.original_price,
-            'newPrice': p.current_price,
-            'discount': p.discount_percent,
-            'image': p.image_url,
+            'current_price': p.current_price,
+            'original_price': p.original_price,
+            'discount_percent': p.discount_percent,
+            'image_url': p.image_url,
             'url': p.product_url,
-            'realDeal': p.real_deal_status
+            'real_deal_status': p.real_deal_status
         } for p in products.items],
         'total': products.total,
         'pages': products.pages,
         'current_page': products.page
     })
 
-@app.route('/api/products/<int:product_id>', methods=['GET'])
-def get_product(product_id):
-    product = Product.query.get_or_404(product_id)
-    
-    # Get price history
-    history = PriceHistory.query.filter_by(product_id=product_id).order_by(PriceHistory.recorded_at.desc()).limit(30).all()
-    
-    return jsonify({
-        'id': product.id,
-        'title': product.title,
-        'platform': product.platform,
-        'category': product.category,
-        'oldPrice': product.original_price,
-        'newPrice': product.current_price,
-        'discount': product.discount_percent,
-        'image': product.image_url,
-        'url': product.product_url,
-        'realDeal': product.real_deal_status,
-        'priceHistory': [{
-            'price': h.price,
-            'date': h.recorded_at.isoformat()
-        } for h in history]
-    })
-
-# ==================== FAVORITES ROUTES ====================
-
-@app.route('/api/favorites', methods=['GET'])
-@token_required
-def get_favorites(current_user):
-    favorites = Favorite.query.filter_by(user_id=current_user.id).all()
-    product_ids = [f.product_id for f in favorites]
-    products = Product.query.filter(Product.id.in_(product_ids)).all()
-    
-    return jsonify({
-        'favorites': [{
-            'id': p.id,
-            'title': p.title,
-            'platform': p.platform,
-            'category': p.category,
-            'oldPrice': p.original_price,
-            'newPrice': p.current_price,
-            'discount': p.discount_percent,
-            'image': p.image_url,
-            'url': p.product_url,
-            'realDeal': p.real_deal_status
-        } for p in products]
-    })
-
-@app.route('/api/favorites', methods=['POST'])
-@token_required
-def add_favorite(current_user):
+# 2. POST Products (YENİ - Link ile Ekleme - SCRAPING BURADA!)
+@app.route('/api/products', methods=['POST'])
+def add_product_via_link():
     data = request.get_json()
-    product_id = data['product_id']
+    url = data.get('url')
     
-    # Check if already favorited
-    existing = Favorite.query.filter_by(user_id=current_user.id, product_id=product_id).first()
+    if not url:
+        return jsonify({'message': 'URL gerekli'}), 400
+
+    # 1. Önce bu ürün zaten var mı bakalım
+    existing = Product.query.filter_by(product_url=url).first()
     if existing:
-        return jsonify({'message': 'Already in favorites'}), 400
-    
-    favorite = Favorite(user_id=current_user.id, product_id=product_id)
-    db.session.add(favorite)
-    db.session.commit()
-    
-    return jsonify({'message': 'Added to favorites'}), 201
+        return jsonify({'message': 'Bu ürün zaten takip ediliyor', 'id': existing.id}), 200
 
-@app.route('/api/favorites/<int:product_id>', methods=['DELETE'])
-@token_required
-def remove_favorite(current_user, product_id):
-    favorite = Favorite.query.filter_by(user_id=current_user.id, product_id=product_id).first()
-    
-    if not favorite:
-        return jsonify({'message': 'Not in favorites'}), 404
-    
-    db.session.delete(favorite)
-    db.session.commit()
-    
-    return jsonify({'message': 'Removed from favorites'})
-
-# ==================== PRICE ALERTS ROUTES ====================
-
-@app.route('/api/alerts', methods=['GET'])
-@token_required
-def get_alerts(current_user):
-    # JOIN ile tek sorguda al - N+1 problemi çözüldü
-    results = db.session.query(PriceAlert, Product).\
-        join(Product, PriceAlert.product_id == Product.id).\
-        filter(PriceAlert.user_id == current_user.id, PriceAlert.is_active == True).all()
-    
-    alert_list = []
-    for alert, product in results:
-        alert_list.append({
-            'id': alert.id,
-            'target_price': alert.target_price,
-            'created_at': alert.created_at.isoformat(),
-            'product': {
-                'id': product.id,
-                'title': product.title,
-                'current_price': product.current_price,
-                'image': product.image_url,
-                'url': product.product_url
-            }
-        })
-    
-    return jsonify({'alerts': alert_list})
-
-@app.route('/api/alerts', methods=['POST'])
-@token_required
-def create_alert(current_user):
-    data = request.get_json()
-    
-    alert = PriceAlert(
-        user_id=current_user.id,
-        product_id=data['product_id'],
-        target_price=data['target_price']
-    )
-    
-    db.session.add(alert)
-    db.session.commit()
-    
-    return jsonify({'message': 'Price alert created'}), 201
-
-@app.route('/api/alerts/<int:alert_id>', methods=['DELETE'])
-@token_required
-def delete_alert(current_user, alert_id):
-    alert = PriceAlert.query.filter_by(id=alert_id, user_id=current_user.id).first()
-    
-    if not alert:
-        return jsonify({'message': 'Alert not found'}), 404
-    
-    db.session.delete(alert)
-    db.session.commit()
-    
-    return jsonify({'message': 'Alert deleted'})
-
-# ==================== STATS ROUTES ====================
-
-@app.route('/api/stats', methods=['GET'])
-def get_stats():
-    total_products = Product.query.count()
-    total_deals = Product.query.filter(Product.discount_percent >= 20).count()
-    avg_discount = db.session.query(db.func.avg(Product.discount_percent)).scalar()
-    
-    return jsonify({
-        'total_products': total_products,
-        'total_deals': total_deals,
-        'avg_discount': round(avg_discount, 2) if avg_discount else 0
-    })
-
-# ==================== ADMIN ROUTES ====================
-
-@app.route('/api/admin/products', methods=['POST'])
-@token_required
-@admin_required
-def admin_create_product(current_user):
-    """Admin only - Create new product"""
-    data = request.get_json()
-    
-    # Validate required fields
-    required_fields = ['title', 'platform', 'category', 'current_price', 'original_price', 
-                      'discount_percent', 'image_url', 'product_url']
-    for field in required_fields:
-        if field not in data:
-            return jsonify({'message': f'Missing required field: {field}'}), 400
-    
-    product = Product(
-        title=data['title'],
-        platform=data['platform'],
-        category=data['category'],
-        current_price=data['current_price'],
-        original_price=data['original_price'],
-        discount_percent=data['discount_percent'],
-        image_url=data['image_url'],
-        product_url=data['product_url'],
-        real_deal_status=data.get('real_deal_status', 'normal')
-    )
-    
-    db.session.add(product)
-    db.session.commit()
-    
-    # Add to price history
-    history = PriceHistory(product_id=product.id, price=data['current_price'])
-    db.session.add(history)
-    db.session.commit()
-    
-    return jsonify({'message': 'Product created', 'id': product.id}), 201
-
-@app.route('/api/admin/products/<int:product_id>', methods=['PUT'])
-@token_required
-@admin_required
-def admin_update_product(current_user, product_id):
-    """Admin only - Update product"""
-    product = Product.query.get_or_404(product_id)
-    data = request.get_json()
-    
-    # Update fields
-    if 'title' in data:
-        product.title = data['title']
-    if 'current_price' in data:
-        old_price = product.current_price
-        product.current_price = data['current_price']
+    # 2. Yoksa Scraper'ı çalıştır
+    try:
+        print(f"🕵️‍♂️ Scraping başlatılıyor: {url}")
+        scraper = ProductScraper(headless=True)
+        product_data = scraper.scrape_single_product(url)
         
-        # Add to price history if price changed
-        if old_price != data['current_price']:
-            history = PriceHistory(product_id=product.id, price=data['current_price'])
-            db.session.add(history)
-            
-            # Check alerts and notify users
-            alerts = PriceAlert.query.filter_by(product_id=product_id, is_active=True).all()
-            for alert in alerts:
-                if data['current_price'] <= alert.target_price:
-                    # TODO: Send notification (email/push)
-                    print(f"🔔 Alert triggered for user {alert.user_id} - Product {product.title} dropped to {data['current_price']}")
-    
-    if 'original_price' in data:
-        product.original_price = data['original_price']
-    
-    if 'discount_percent' in data:
-        product.discount_percent = data['discount_percent']
-    
-    if 'real_deal_status' in data:
-        product.real_deal_status = data['real_deal_status']
-    
-    if 'platform' in data:
-        product.platform = data['platform']
-    
-    if 'category' in data:
-        product.category = data['category']
-    
-    product.updated_at = datetime.utcnow()
-    db.session.commit()
-    
-    return jsonify({'message': 'Product updated', 'id': product.id})
+        if not product_data:
+            return jsonify({'message': 'Ürün bilgileri çekilemedi. Linki kontrol edin.'}), 400
+        
+        # 3. Veritabanına kaydet
+        new_product = Product(
+            title=product_data['title'],
+            platform=product_data['platform'],
+            category=product_data['category'],
+            current_price=product_data['current_price'],
+            original_price=product_data['original_price'],
+            discount_percent=product_data['discount_percent'],
+            image_url=product_data['image_url'],
+            product_url=product_data['product_url'],
+            real_deal_status='normal'
+        )
+        
+        db.session.add(new_product)
+        db.session.commit()
+        
+        # Fiyat geçmişine de ekle
+        history = PriceHistory(product_id=new_product.id, price=new_product.current_price)
+        db.session.add(history)
+        db.session.commit()
+        
+        return jsonify({'message': '✅ Ürün başarıyla eklendi!', 'product': product_data}), 201
 
-@app.route('/api/admin/products/<int:product_id>', methods=['DELETE'])
-@token_required
-@admin_required
-def admin_delete_product(current_user, product_id):
-    """Admin only - Delete product"""
-    product = Product.query.get_or_404(product_id)
+    except Exception as e:
+        print(f"❌ Hata: {e}")
+        return jsonify({'message': 'Sunucu hatası', 'error': str(e)}), 500
+
+# 3. DELETE Product (Silme)
+@app.route('/api/products/<int:id>', methods=['DELETE'])
+def delete_product(id):
+    # Basitlik için admin kontrolü kapalı, herkes silebilir (Demo modu)
+    product = Product.query.get_or_404(id)
     
-    # Delete related records (cascade should handle this, but explicit is better)
-    PriceHistory.query.filter_by(product_id=product_id).delete()
-    Favorite.query.filter_by(product_id=product_id).delete()
-    PriceAlert.query.filter_by(product_id=product_id).delete()
+    # İlişkili kayıtları temizle
+    PriceHistory.query.filter_by(product_id=id).delete()
+    Favorite.query.filter_by(product_id=id).delete()
+    PriceAlert.query.filter_by(product_id=id).delete()
     
     db.session.delete(product)
     db.session.commit()
-    
-    return jsonify({'message': 'Product deleted', 'id': product_id})
+    return jsonify({'message': 'Ürün silindi'})
 
-# ==================== INITIALIZE DATABASE ====================
+# ==================== INITIALIZE ====================
 
 def init_db():
-    """Initialize database with tables and sample data"""
     with app.app_context():
         db.create_all()
-        
-        # Add sample data if database is empty
-        if Product.query.count() == 0:
-            sample_products = [
-                {
-                    'title': 'iPhone 15 Pro Max 256GB',
-                    'platform': 'Trendyol',
-                    'category': 'Elektronik',
-                    'current_price': 67499,
-                    'original_price': 89999,
-                    'discount_percent': 25,
-                    'image_url': 'https://images.unsplash.com/photo-1696446702001-80b18e0879f9?w=500&q=80',
-                    'product_url': 'https://www.trendyol.com',
-                    'real_deal_status': 'real'
-                },
-                {
-                    'title': 'Samsung 65" QLED 4K Smart TV',
-                    'platform': 'Hepsiburada',
-                    'category': 'Elektronik',
-                    'current_price': 32999,
-                    'original_price': 45999,
-                    'discount_percent': 28,
-                    'image_url': 'https://images.unsplash.com/photo-1593359677879-a4bb92f829d1?w=500&q=80',
-                    'product_url': 'https://www.hepsiburada.com',
-                    'real_deal_status': 'real'
-                },
-                {
-                    'title': 'Nike Air Max 270 Erkek Spor Ayakkabı',
-                    'platform': 'N11',
-                    'category': 'Moda',
-                    'current_price': 2999,
-                    'original_price': 4999,
-                    'discount_percent': 40,
-                    'image_url': 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=500&q=80',
-                    'product_url': 'https://www.n11.com',
-                    'real_deal_status': 'real'
-                }
-            ]
-            
-            for data in sample_products:
-                product = Product(**data)
-                db.session.add(product)
-                db.session.commit()
-                
-                # Add price history
-                history = PriceHistory(product_id=product.id, price=data['current_price'])
-                db.session.add(history)
-            
-            db.session.commit()
-            print("✅ Sample data added!")
-        
-        # Add admin user if not exists
-        admin = User.query.filter_by(email='admin@indirimradar.com').first()
-        if not admin:
+        # Admin User Ekle
+        if not User.query.filter_by(email='admin@indirimradar.com').first():
             admin = User(
                 email='admin@indirimradar.com',
                 password=generate_password_hash('Admin123!', method='pbkdf2:sha256'),
@@ -570,65 +241,11 @@ def init_db():
             )
             db.session.add(admin)
             db.session.commit()
-            print('✅ Admin user created!')
-        else:
-            print('ℹ️ Admin user already exists')
+            print("✅ Admin oluşturuldu.")
 
-# ==================== HEALTH CHECK ====================
-
-@app.route('/health', methods=['GET'])
-def health_check():
-    """Health check endpoint for monitoring"""
-    try:
-        # SQLAlchemy 2.0 uyumlu - text() kullanımı
-        db.session.execute(text('SELECT 1'))
-        return jsonify({
-            'status': 'healthy',
-            'database': 'connected',
-            'timestamp': datetime.utcnow().isoformat()
-        }), 200
-    except Exception as e:
-        return jsonify({
-            'status': 'unhealthy',
-            'database': 'disconnected',
-            'error': str(e),
-            'timestamp': datetime.utcnow().isoformat()
-        }), 500
-
-@app.route('/', methods=['GET'])
-def index():
-    """Root endpoint"""
-    return jsonify({
-        'message': '🔥 İndirimRadar API',
-        'version': '1.0.0',
-        'status': 'running',
-        'endpoints': {
-            'health': '/health',
-            'products': '/api/products',
-            'auth': '/api/auth/login',
-            'stats': '/api/stats'
-        }
-    })
-
-# ==================== INITIALIZE ON STARTUP ====================
-
-# Initialize database automatically (works with gunicorn too)
-try:
-    init_db()
-    print("🔄 Database initialization completed")
-except Exception as e:
-    print(f"⚠️ Database initialization error: {e}")
-
-# ==================== RUN ====================
+# Başlangıçta çalıştır
+init_db()
 
 if __name__ == '__main__':
-    # Get port from environment variable (Railway provides this)
     port = int(os.getenv('PORT', 5000))
-    
-    # Run app
-    is_production = os.getenv('FLASK_ENV') == 'production'
-    app.run(
-        debug=not is_production,
-        host='0.0.0.0',
-        port=port
-    )
+    app.run(host='0.0.0.0', port=port)
