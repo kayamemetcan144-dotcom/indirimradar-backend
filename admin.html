@@ -75,17 +75,6 @@
         }
         .page-title h1 { font-size: 1.5rem; color: #1f2937; }
         
-        .btn-site {
-            background: #667eea;
-            color: white;
-            padding: 10px 20px;
-            border-radius: 8px;
-            text-decoration: none;
-            font-weight: 500;
-            transition: 0.3s;
-        }
-        .btn-site:hover { background: #764ba2; }
-
         /* Stats Grid */
         .stats-grid {
             display: grid;
@@ -139,9 +128,10 @@
         th { text-align: left; padding: 15px; color: #6b7280; font-size: 0.9rem; border-bottom: 2px solid #f3f4f6; }
         td { padding: 15px; border-bottom: 1px solid #f3f4f6; vertical-align: middle; }
         .product-info { display: flex; align-items: center; gap: 15px; }
-        .product-info img { width: 40px; height: 40px; border-radius: 8px; object-fit: contain; border: 1px solid #eee; }
+        .product-info img { width: 50px; height: 50px; border-radius: 8px; object-fit: contain; border: 1px solid #eee; background: white; }
         
         .badge { padding: 5px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; }
+        .badge-cat { background: #e0e7ff; color: #4338ca; }
         .badge-hb { background: #fff7ed; color: #c2410c; }
         .badge-ty { background: #fff1f2; color: #e11d48; }
 
@@ -161,19 +151,21 @@
         .modal.active { display: flex; }
         .modal-content {
             background: white; padding: 30px; border-radius: 15px;
-            width: 100%; max-width: 500px;
+            width: 100%; max-width: 600px;
+            max-height: 90vh; overflow-y: auto;
             animation: slideIn 0.3s ease;
         }
         @keyframes slideIn { from { transform: translateY(-20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 
         .form-group { margin-bottom: 15px; }
         .form-group label { display: block; margin-bottom: 8px; font-weight: 600; color: #374151; font-size: 0.9rem; }
-        .form-input {
+        .form-input, .form-select {
             width: 100%; padding: 12px;
             border: 1px solid #e5e7eb; border-radius: 8px;
             font-size: 1rem; outline: none; transition: 0.3s;
+            background: #f9fafb;
         }
-        .form-input:focus { border-color: #667eea; box-shadow: 0 0 0 3px rgba(102,126,234,0.1); }
+        .form-input:focus, .form-select:focus { border-color: #667eea; box-shadow: 0 0 0 3px rgba(102,126,234,0.1); background: white; }
         
         .row { display: flex; gap: 15px; }
         .modal-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
@@ -199,7 +191,7 @@
         <div class="logo"><i class="fas fa-bolt"></i> İndirimRadar</div>
         <ul class="menu">
             <li><a href="#" class="active"><i class="fas fa-box"></i> Ürünler</a></li>
-            <li><a href="index.html" target="_blank"><i class="fas fa-globe"></i> Siteyi Görüntüle</a></li>
+            <li><a href="index.html" target="_blank"><i class="fas fa-globe"></i> Siteye Git</a></li>
         </ul>
     </aside>
 
@@ -229,6 +221,7 @@
                 <thead>
                     <tr>
                         <th>Ürün Adı</th>
+                        <th>Kategori</th>
                         <th>Platform</th>
                         <th>Fiyat</th>
                         <th>İndirim</th>
@@ -250,6 +243,33 @@
                 <input type="text" class="form-input" id="productUrl" placeholder="https://...">
             </div>
 
+            <div class="form-group">
+                <label>Görsel Linki (Opsiyonel)</label>
+                <input type="text" class="form-input" id="manualImage" placeholder="https://ornek.com/resim.jpg (Boş bırakırsan bot bulur)">
+            </div>
+
+            <div class="form-group">
+                <label>Kategori Seç (Opsiyonel)</label>
+                <select class="form-select" id="manualCategory">
+                    <option value="">Otomatik (Bot Bulsun)</option>
+                    <option value="Elektronik">Elektronik</option>
+                    <option value="Ev, Yaşam, Yapı Market">Ev, Yaşam, Yapı Market</option>
+                    <option value="Anne Bebek">Anne Bebek</option>
+                    <option value="Cep Telefonu ve Aksesuar">Cep Telefonu ve Aksesuar</option>
+                    <option value="Ayakkabı, Çanta">Ayakkabı, Çanta</option>
+                    <option value="Kitap, Kırtasiye, Hobi, Oyuncak">Kitap, Kırtasiye, Hobi, Oyuncak</option>
+                    <option value="Kişisel Bakım ve Kozmetik">Kişisel Bakım ve Kozmetik</option>
+                    <option value="Moda">Moda</option>
+                    <option value="Otomobil, Motosiklet">Otomobil, Motosiklet</option>
+                    <option value="Oyun, Konsol ve Dijital Servisler">Oyun, Konsol ve Dijital Servisler</option>
+                    <option value="Spor ve Outdoor">Spor ve Outdoor</option>
+                    <option value="Kırtasiye, Ofis">Kırtasiye, Ofis</option>
+                    <option value="Oto, Bahçe, Yapı Market">Oto, Bahçe, Yapı Market</option>
+                    <option value="Süpermarket, Pet Shop">Süpermarket, Pet Shop</option>
+                    <option value="Kitap, Müzik, Film, Hobi">Kitap, Müzik, Film, Hobi</option>
+                </select>
+            </div>
+
             <div class="row">
                 <div class="form-group" style="flex:1">
                     <label>Satış Fiyatı (TL)</label>
@@ -263,10 +283,8 @@
 
             <div class="form-group">
                 <label>İndirim Oranı (%)</label>
-                <input type="number" class="form-input" id="manualDiscount" placeholder="Otomatik hesaplanır, istersen yaz">
+                <input type="number" class="form-input" id="manualDiscount" placeholder="Otomatik hesaplanır">
             </div>
-
-            <p style="font-size:0.8rem; color:#6b7280; margin-bottom:20px">* Fiyatları boş bırakırsan bot siteden otomatik çeker.</p>
 
             <div class="modal-footer">
                 <button class="btn-cancel" onclick="closeModal()">İptal</button>
@@ -303,7 +321,7 @@
             tbody.innerHTML = '';
             
             if(products.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px">Henüz ürün yok.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:20px">Henüz ürün yok.</td></tr>';
                 return;
             }
 
@@ -315,13 +333,14 @@
                     <tr>
                         <td>
                             <div class="product-info">
-                                <img src="${p.image_url}" onerror="this.src='https://via.placeholder.com/40'">
+                                <img src="${p.image_url}" onerror="this.src='https://via.placeholder.com/50?text=Yok'">
                                 <div>
                                     <div style="font-weight:500">${p.title}</div>
                                     <a href="${p.url}" target="_blank" style="font-size:0.75rem; color:#667eea; text-decoration:none">Linki Aç ↗</a>
                                 </div>
                             </div>
                         </td>
+                        <td><span class="badge badge-cat">${p.category}</span></td>
                         <td><span class="badge ${badgeClass}">${p.platform}</span></td>
                         <td><span style="font-weight:600">${p.current_price} TL</span>${oldPrice}</td>
                         <td>${p.discount_percent > 0 ? `<span style="color:#10b981; font-weight:bold">%${p.discount_percent}</span>` : '-'}</td>
@@ -342,6 +361,8 @@
             const price = document.getElementById('manualPrice').value;
             const oldPrice = document.getElementById('manualOldPrice').value;
             const discount = document.getElementById('manualDiscount').value;
+            const image = document.getElementById('manualImage').value;
+            const category = document.getElementById('manualCategory').value;
 
             if(!url) return alert("Lütfen link girin!");
             
@@ -356,15 +377,21 @@
                         url: url,
                         manual_price: price ? parseFloat(price) : null,
                         manual_old_price: oldPrice ? parseFloat(oldPrice) : null,
-                        manual_discount: discount ? parseInt(discount) : null
+                        manual_discount: discount ? parseInt(discount) : null,
+                        manual_image: image ? image : null,
+                        manual_category: category ? category : null
                     })
                 });
                 
                 if(res.ok) {
                     alert("✅ Ürün başarıyla eklendi!");
+                    // Formu temizle
                     document.getElementById('productUrl').value = '';
                     document.getElementById('manualPrice').value = '';
                     document.getElementById('manualOldPrice').value = '';
+                    document.getElementById('manualDiscount').value = '';
+                    document.getElementById('manualImage').value = '';
+                    document.getElementById('manualCategory').value = '';
                     loadProducts();
                 } else {
                     const d = await res.json();
