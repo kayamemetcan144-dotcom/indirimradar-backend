@@ -58,6 +58,7 @@ class ProductScraper:
         # WebDriver olduğunu gizle
         driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
         return driver
+        
     # ==================== YENİ: TEK ÜRÜN ÇEKME (LINK İLE) ====================
     def scrape_single_product(self, url):
         """
