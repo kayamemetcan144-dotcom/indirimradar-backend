@@ -3,221 +3,91 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>İndirimRadar - Fırsatları Yakala</title>
+    <title>İndirimRadar - Fırsatlar</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
-        :root { 
-            --primary: #FF6600; /* Canlı Turuncu */
-            --secondary: #1e293b; /* Koyu Lacivert */
-            --bg: #f8fafc; 
-        }
-        
-        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); margin: 0; color: #333; }
-        
-        /* Navbar */
-        .navbar { 
-            background: white; 
-            padding: 15px 5%; 
-            display: flex; 
-            align-items: center; 
-            justify-content: space-between; 
-            box-shadow: 0 4px 12px rgba(0,0,0,0.05); 
-            position: sticky; top: 0; z-index: 100;
-        }
-
-        .logo { font-size: 1.6rem; font-weight: 800; color: var(--primary); text-decoration: none; display: flex; align-items: center; gap: 8px; }
-        
-        /* Arama Çubuğu */
+        :root { --primary: #FF6600; --secondary: #2c3e50; --bg: #f8fafc; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); margin: 0; }
+        .navbar { background: white; padding: 15px 5%; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 12px rgba(0,0,0,0.05); position: sticky; top: 0; z-index: 100; }
+        .logo { font-size: 1.6rem; font-weight: 800; color: var(--primary); text-decoration: none; }
         .search-container { flex: 1; max-width: 500px; margin: 0 20px; position: relative; }
-        .search-input {
-            width: 100%;
-            padding: 12px 20px;
-            padding-left: 45px;
-            border: 2px solid #e2e8f0;
-            border-radius: 50px;
-            font-size: 1rem;
-            transition: 0.3s;
-            background: #f1f5f9;
-        }
-        .search-input:focus { border-color: var(--primary); background: white; outline: none; }
+        .search-input { width: 100%; padding: 12px 20px 12px 45px; border: 2px solid #e2e8f0; border-radius: 50px; outline: none; background: #f1f5f9; }
+        .search-input:focus { border-color: var(--primary); background: white; }
         .search-icon { position: absolute; left: 15px; top: 50%; transform: translateY(-50%); color: #94a3b8; }
-
-        .btn-login { 
-            background: var(--secondary); color: white; padding: 10px 20px; 
-            border-radius: 30px; text-decoration: none; font-weight: 600; 
-            font-size: 0.9rem; transition: 0.3s; 
-        }
-        .btn-login:hover { background: var(--primary); }
-
-        /* Kategoriler */
-        .category-scroll {
-            display: flex; gap: 10px; padding: 15px 5%; overflow-x: auto; 
-            background: white; border-bottom: 1px solid #e2e8f0;
-            white-space: nowrap; scrollbar-width: none;
-        }
-        .category-scroll::-webkit-scrollbar { display: none; }
-        
-        .cat-btn {
-            padding: 8px 16px; background: #f1f5f9; border-radius: 20px;
-            color: var(--secondary); text-decoration: none; font-size: 0.9rem;
-            font-weight: 500; transition: 0.2s; cursor: pointer;
-        }
-        .cat-btn:hover, .cat-btn.active { background: var(--primary); color: white; }
-
-        /* Ürün Vitrini */
-        .container { padding: 2rem 5%; }
-        .section-title { font-size: 1.4rem; font-weight: 700; margin-bottom: 20px; color: var(--secondary); display: flex; align-items: center; gap: 10px; }
-
-        .products-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 25px; }
-        
-        .product-card { 
-            background: white; border-radius: 12px; overflow: hidden; 
-            box-shadow: 0 2px 8px rgba(0,0,0,0.04); transition: transform 0.3s; 
-            position: relative; display: flex; flex-direction: column;
-        }
-        .product-card:hover { transform: translateY(-5px); box-shadow: 0 10px 20px rgba(0,0,0,0.08); }
-
-        .badge { 
-            position: absolute; top: 10px; right: 10px; background: #ef4444; 
-            color: white; padding: 5px 10px; border-radius: 8px; 
-            font-weight: bold; font-size: 0.8rem; z-index: 2; 
-        }
-
-        .card-img { width: 100%; height: 200px; object-fit: contain; padding: 20px; box-sizing: border-box; }
+        .category-scroll { display: flex; gap: 10px; padding: 15px 5%; overflow-x: auto; background: white; white-space: nowrap; scrollbar-width: none; }
+        .cat-btn { padding: 8px 16px; background: #f1f5f9; border-radius: 20px; color: var(--secondary); cursor: pointer; transition: 0.2s; }
+        .cat-btn.active, .cat-btn:hover { background: var(--primary); color: white; }
+        .products-grid { padding: 2rem 5%; display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 25px; }
+        .product-card { background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.04); position: relative; display: flex; flex-direction: column; transition: transform 0.3s; }
+        .product-card:hover { transform: translateY(-5px); }
+        .badge { position: absolute; top: 10px; right: 10px; background: #ef4444; color: white; padding: 5px 10px; border-radius: 8px; font-weight: bold; font-size: 0.8rem; }
+        .card-img { width: 100%; height: 200px; object-fit: contain; padding: 20px; }
         .card-body { padding: 15px; flex: 1; display: flex; flex-direction: column; }
-        
-        .card-cat { font-size: 0.75rem; color: #94a3b8; text-transform: uppercase; margin-bottom: 5px; }
-        .card-title { font-size: 0.95rem; font-weight: 600; color: #334155; margin-bottom: 10px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; height: 2.8em; }
-        
+        .card-title { font-weight: 600; margin-bottom: 10px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; height: 2.8em; }
         .price-row { margin-top: auto; display: flex; justify-content: space-between; align-items: center; }
-        .price-box { display: flex; flex-direction: column; }
-        .old-price { font-size: 0.85rem; text-decoration: line-through; color: #cbd5e1; }
         .current-price { font-size: 1.3rem; font-weight: 800; color: var(--primary); }
-        
-        .btn-go { 
-            width: 35px; height: 35px; border-radius: 50%; background: #f1f5f9; 
-            display: flex; align-items: center; justify-content: center; 
-            color: var(--secondary); text-decoration: none; transition: 0.2s;
-        }
+        .old-price { font-size: 0.85rem; text-decoration: line-through; color: #cbd5e1; }
+        .btn-go { width: 35px; height: 35px; border-radius: 50%; background: #f1f5f9; display: flex; align-items: center; justify-content: center; color: var(--secondary); text-decoration: none; }
         .btn-go:hover { background: var(--primary); color: white; }
-
-        .loading { text-align: center; padding: 3rem; color: #94a3b8; width: 100%; }
-
-        @media (max-width: 768px) {
-            .navbar { flex-wrap: wrap; gap: 10px; padding: 15px; }
-            .search-container { order: 3; min-width: 100%; margin: 0; }
-        }
+        @media (max-width: 768px) { .navbar { flex-wrap: wrap; gap: 10px; } .search-container { order: 3; min-width: 100%; margin: 0; } }
     </style>
 </head>
 <body>
-
     <nav class="navbar">
-        <a href="#" class="logo"><i class="fas fa-bolt"></i> İndirimRadar</a>
-        
-        <div class="search-container">
-            <i class="fas fa-search search-icon"></i>
-            <input type="text" class="search-input" id="searchInput" placeholder="Ürün, kategori veya marka ara..." onkeyup="filterProducts()">
-        </div>
-
-        <a href="#" class="btn-login"><i class="fas fa-user-circle"></i> Giriş Yap</a>
+        <a href="#" class="logo">İndirimRadar</a>
+        <div class="search-container"><i class="fas fa-search search-icon"></i><input type="text" class="search-input" id="searchInput" placeholder="Ara..." onkeyup="filterProducts()"></div>
     </nav>
-
     <div class="category-scroll">
         <div class="cat-btn active" onclick="filterBy('all')">Tümü</div>
         <div class="cat-btn" onclick="filterBy('Elektronik')">Elektronik</div>
-        <div class="cat-btn" onclick="filterBy('Ev')">Ev, Yaşam</div>
-        <div class="cat-btn" onclick="filterBy('Anne')">Anne Bebek</div>
-        <div class="cat-btn" onclick="filterBy('Telefon')">Cep Telefonu</div>
-        <div class="cat-btn" onclick="filterBy('Ayakkabı')">Ayakkabı, Çanta</div>
-        <div class="cat-btn" onclick="filterBy('Kitap')">Kitap, Hobi</div>
-        <div class="cat-btn" onclick="filterBy('Kozmetik')">Kozmetik</div>
         <div class="cat-btn" onclick="filterBy('Moda')">Moda</div>
-        <div class="cat-btn" onclick="filterBy('Oto')">Otomobil</div>
-        <div class="cat-btn" onclick="filterBy('Spor')">Spor, Outdoor</div>
+        <div class="cat-btn" onclick="filterBy('Ev')">Ev Yaşam</div>
         <div class="cat-btn" onclick="filterBy('Süpermarket')">Süpermarket</div>
     </div>
-
-    <div class="container">
-        <div class="section-title"><i class="fas fa-fire-alt" style="color:#ef4444"></i> Günün Fırsatları</div>
-        <div class="products-grid" id="products-container">
-            <div class="loading">Fırsatlar yükleniyor...</div>
-        </div>
+    <div class="products-grid" id="products-container">
+        <p style="text-align:center; width:100%; color:#999">Yükleniyor...</p>
     </div>
-
     <script>
-        // API URL (Railway)
         const API_URL = "https://indirimradar-backend-production.up.railway.app"; 
         let allProducts = [];
-
-        window.onload = loadProducts;
-
-        async function loadProducts() {
-            const container = document.getElementById('products-container');
+        window.onload = async () => {
             try {
                 const res = await fetch(`${API_URL}/api/products`);
                 const data = await res.json();
-                container.innerHTML = ''; 
-
-                if (data.products.length === 0) {
-                    container.innerHTML = '<p class="loading">Henüz ürün eklenmemiş.</p>';
-                    return;
-                }
-
-                allProducts = data.products;
+                allProducts = data.products || [];
                 render(allProducts);
-
-            } catch (error) {
-                console.error(error);
-                container.innerHTML = '<p class="loading" style="color:red">Sunucuya bağlanılamadı!</p>';
-            }
-        }
-
-        function render(products) {
+            } catch(e) { console.error(e); }
+        };
+        function render(list) {
             const container = document.getElementById('products-container');
             container.innerHTML = '';
-            
-            products.forEach(p => {
+            if(list.length===0) return container.innerHTML='<p>Ürün yok.</p>';
+            list.forEach(p => {
                 const badge = p.discount_percent > 0 ? `<div class="badge">%${p.discount_percent}</div>` : '';
-                const oldPrice = p.original_price > p.current_price ? `<div class="old-price">${p.original_price} TL</div>` : '';
-
-                const html = `
-                    <div class="product-card">
-                        ${badge}
-                        <img src="${p.image_url}" class="card-img" onerror="this.src='https://via.placeholder.com/300'">
-                        <div class="card-body">
-                            <div class="card-cat">${p.platform}</div>
-                            <div class="card-title" title="${p.title}">${p.title}</div>
-                            <div class="price-row">
-                                <div class="price-box">
-                                    ${oldPrice}
-                                    <div class="current-price">${p.current_price} TL</div>
-                                </div>
-                                <a href="${p.url}" target="_blank" class="btn-go"><i class="fas fa-arrow-right"></i></a>
-                            </div>
+                const old = p.original_price > p.current_price ? `<div class="old-price">${p.original_price} TL</div>` : '';
+                container.innerHTML += `
+                <div class="product-card">
+                    ${badge}
+                    <img src="${p.image_url}" class="card-img" onerror="this.src='https://via.placeholder.com/300'">
+                    <div class="card-body">
+                        <div style="font-size:0.8rem; color:#999">${p.platform}</div>
+                        <div class="card-title">${p.title}</div>
+                        <div class="price-row">
+                            <div>${old}<div class="current-price">${p.current_price} TL</div></div>
+                            <a href="${p.url}" target="_blank" class="btn-go"><i class="fas fa-arrow-right"></i></a>
                         </div>
-                    </div>`;
-                container.innerHTML += html;
+                    </div>
+                </div>`;
             });
         }
-
         function filterProducts() {
             const term = document.getElementById('searchInput').value.toLowerCase();
-            const filtered = allProducts.filter(p => p.title.toLowerCase().includes(term));
-            render(filtered);
+            render(allProducts.filter(p => p.title.toLowerCase().includes(term)));
         }
-
         function filterBy(cat) {
             document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('active'));
             event.target.classList.add('active');
-            
-            if(cat === 'all') render(allProducts);
-            else {
-                const filtered = allProducts.filter(p => 
-                    p.category.toLowerCase().includes(cat.toLowerCase()) || 
-                    p.title.toLowerCase().includes(cat.toLowerCase())
-                );
-                render(filtered);
-            }
+            render(cat==='all' ? allProducts : allProducts.filter(p => p.category.toLowerCase().includes(cat.toLowerCase()) || p.title.toLowerCase().includes(cat.toLowerCase())));
         }
     </script>
 </body>
