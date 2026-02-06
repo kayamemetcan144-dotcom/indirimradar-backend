@@ -14,6 +14,7 @@ class ProductScraper:
 
     def setup_selenium(self):
         print("🕵️‍♂️ Chrome başlatılıyor...")
+        # Railway ve Local yolları
         chrome_path = shutil.which("chromium") or shutil.which("google-chrome") or "/usr/bin/chromium"
         driver_path = shutil.which("chromedriver") or "/usr/bin/chromedriver"
         
@@ -23,6 +24,7 @@ class ProductScraper:
         chrome_options = Options()
         if self.headless: chrome_options.add_argument('--headless')
         
+        # Bot engellerini aşmak için kritik ayarlar
         chrome_options.add_argument('--no-sandbox')
         chrome_options.add_argument('--disable-dev-shm-usage')
         chrome_options.add_argument('--disable-gpu')
@@ -46,64 +48,52 @@ class ProductScraper:
         
         try:
             driver.get(url)
-            time.sleep(5) 
-            page_source = driver.page_source
-            soup = BeautifulSoup(page_source, 'html.parser')
+            time.sleep(3) # Sayfa otursun
+            soup = BeautifulSoup(driver.page_source, 'html.parser')
             
-            # --- DEĞİŞKENLER ---
+            # --- 1. HEPSİBURADA FİYAT (Nokta Atışı) ---
             current_price = 0.0
             original_price = 0.0
-            title = "Ürün Başlığı"
-            image_url = ""
+            
+            # A) Güncel Fiyat (Yeşil/Büyük Olan)
+            # Hepsiburada'nın kullandığı net etiket: 'price-current-price'
+            price_box = soup.find(['div', 'span'], {'data-test-id': 'price-current-price'})
+            if price_box:
+                current_price = self.parse_price(price_box.text)
+                print(f"✅ Güncel Fiyat Bulundu: {current_price}")
+            
+            # B) Eski Fiyat (Üstü Çizili Olan)
+            old_price_box = soup.find(['div', 'span'], {'data-test-id': 'price-old-price'})
+            if old_price_box:
+                original_price = self.parse_price(old_price_box.text)
+                print(f"✅ Eski Fiyat Bulundu: {original_price}")
 
-            # --- 1. ÖZEL HEPSİBURADA SEÇİCİLERİ (EN GÜVENİLİR) ---
-            # Hepsiburada genelde fiyatları bu etiketlerle verir, önce bunlara bakacağız.
-            
-            # A) Güncel Fiyat (İndirimli Hali)
-            hb_price = soup.find(['span', 'div'], {'data-test-id': 'price-current-price'})
-            if not hb_price:
-                 hb_price = soup.find(['span', 'div'], {'id': 'offering-price'})
-            
-            if hb_price:
-                current_price = self.parse_price(hb_price.text)
-                print(f"✅ Hepsiburada Etiketi Bulundu: {current_price}")
-
-            # B) Eski Fiyat (Üstü Çizili)
-            hb_old_price = soup.find(['span', 'div'], {'data-test-id': 'price-old-price'})
-            if hb_old_price:
-                original_price = self.parse_price(hb_old_price.text)
-            
-            # --- 2. YEDEK FİYAT ARAMA (Eğer etiket değiştiyse) ---
+            # --- 2. YEDEK PLAN (Eğer Site Tasarımı Değişmişse) ---
             if current_price == 0:
-                print("⚠️ Etiket bulunamadı, derin tarama yapılıyor...")
-                found_prices = []
-                
-                # Regex ile tüm sayıları topla
-                patterns = [
-                    r'"price"\s*:\s*([\d\.]+)', 
-                    r'"currentPrice"\s*:\s*([\d\.]+)',
-                    r'"amount"\s*:\s*([\d\.]+)',
-                    r'(\d{1,3}(?:\.\d{3})*(?:,\d{2})?)\s*TL'
-                ]
-                
-                for pattern in patterns:
-                    matches = re.findall(pattern, page_source)
-                    for m in matches:
-                        p = self.parse_price(m)
-                        if 20 < p < 500000: # 20 TL altını (Taksit/Kargo) filtrele!
-                            found_prices.append(p)
+                print("⚠️ Etiketle bulunamadı, JSON verisine bakılıyor...")
+                # Hepsiburada sayfa içinde 'productModel' adında bir JSON tutar
+                scripts = soup.find_all('script')
+                for script in scripts:
+                    if 'currentPrice' in script.text:
+                        try:
+                            # Regex ile json içindeki fiyatı cımbızla çek
+                            cp_match = re.search(r'"currentPrice"\s*:\s*([\d\.]+)', script.text)
+                            if cp_match: current_price = float(cp_match.group(1))
+                            
+                            op_match = re.search(r'"originalPrice"\s*:\s*([\d\.]+)', script.text)
+                            if op_match: original_price = float(op_match.group(1))
+                            
+                            if current_price > 0: break
+                        except: pass
 
-                if found_prices:
-                    found_prices = sorted(list(set(found_prices)))
-                    # En küçük mantıklı fiyat satış fiyatıdır
-                    current_price = found_prices[0]
-                    # En büyük fiyat eski fiyattır
-                    if len(found_prices) > 1:
-                        original_price = found_prices[-1]
-
-            # Eğer eski fiyat bulunamadıysa veya yenisinden küçükse eşitle
+            # --- MANTIK KONTROLLERİ ---
+            # Eğer eski fiyat yoksa veya yenisinden düşükse (Hata varsa), eşitle.
             if original_price == 0 or original_price < current_price:
                 original_price = current_price
+
+            # Taksit tutarını (örn: 14.90) yanlışlıkla fiyat sanmamak için kontrol
+            # Ürün fiyatı genelde 15-20 TL altı olmaz (mendil bile olsa kargo vs 50+ olur)
+            # Ama biz yine de etiket bulduysak ona güveniriz.
 
             # --- 3. İNDİRİM HESAPLAMA ---
             discount_percent = 0
@@ -112,32 +102,23 @@ class ProductScraper:
                 discount_percent = int((diff / original_price) * 100)
 
             # --- 4. RESİM BULMA ---
-            og_img = soup.find("meta", property="og:image")
-            if og_img: image_url = og_img["content"]
+            image_url = ""
+            # A) Büyük Resim (Carousel içinden)
+            img_box = soup.find('img', {'class': 'product-image'})
+            if img_box: image_url = img_box.get('src')
             
+            # B) Yedek Resim
             if not image_url:
-                matches = re.findall(r'"image"\s*:\s*"([^"]+)"', page_source)
-                for m in matches:
-                    if "http" in m and ("jpg" in m or "png" in m):
-                        image_url = m.replace("\\", "")
-                        break
-            
-            if not image_url:
-                 # Slider içindeki ilk büyük resmi al
-                 imgs = soup.find_all('img')
-                 for img in imgs:
-                     src = img.get('src', '')
-                     if 'mnresize' in src and '1200' in src: # Büyük resim
-                         image_url = src
-                         break
-                     if 'product' in src and not 'svg' in src:
-                         image_url = src
-            
+                og_img = soup.find("meta", property="og:image")
+                if og_img: image_url = og_img["content"]
+
             # --- 5. BAŞLIK ---
-            if soup.title: title = soup.title.string.strip()
-            og_title = soup.find("meta", property="og:title")
-            if og_title: title = og_title["content"].strip()
-            title = title.split(" Fiyatı")[0].split(" - ")[0]
+            title = "Ürün Başlığı"
+            h1 = soup.find('h1', {'id': 'product-name'})
+            if h1: 
+                title = h1.text.strip()
+            elif soup.title:
+                title = soup.title.text.strip()
 
             # Verileri Paketle
             product_data = {
@@ -147,7 +128,7 @@ class ProductScraper:
                 'discount_percent': discount_percent,
                 'image_url': image_url,
                 'product_url': url,
-                'platform': 'Hepsiburada' if 'hepsiburada' in url else 'Diğer',
+                'platform': 'Hepsiburada',
                 'category': 'Genel'
             }
                 
@@ -160,16 +141,10 @@ class ProductScraper:
 
     def parse_price(self, text):
         if not text: return 0.0
+        # "64,99 TL" -> 64.99
         text = str(text).replace('TL', '').strip()
-        
-        # 1.250,50 -> 1250.50
-        if "," in text and "." in text:
-             clean = text.replace('.', '').replace(',', '.')
-        elif "," in text:
-             clean = text.replace(',', '.')
-        else:
-             clean = text
-             
+        # 1.250,00 formatı için
+        clean = text.replace('.', '').replace(',', '.')
         try:
             return float(clean)
         except:
