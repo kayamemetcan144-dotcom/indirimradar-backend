@@ -161,13 +161,14 @@ def get_products():
         'current_page': products.page
     })
 
-# --- MANUEL FİYAT DESTEKLİ ÜRÜN EKLEME ---
+# --- GÜNCELLENMİŞ MANUEL EKLEME FONKSİYONU ---
 @app.route('/api/products', methods=['POST'])
 def add_product_via_link():
     data = request.get_json()
     url = data.get('url')
-    manual_price = data.get('manual_price')        # YENİ: Manuel Fiyat
-    manual_old_price = data.get('manual_old_price') # YENİ: Eski Fiyat
+    manual_price = data.get('manual_price')        # Manuel Satış Fiyatı
+    manual_old_price = data.get('manual_old_price') # Manuel Eski Fiyat
+    manual_discount = data.get('manual_discount')   # Manuel İndirim Oranı (YENİ)
     
     if not url: return jsonify({'message': 'URL gerekli'}), 400
 
@@ -177,50 +178,53 @@ def add_product_via_link():
     try:
         print(f"🕵️‍♂️ Scraping başlatılıyor: {url}")
         
-        # 1. Önce Bot Bilgileri Çeksin (Resim, Başlık vb. için)
+        # 1. Bot Veriyi Çekmeye Çalışsın
         scraper = ProductScraper(headless=True)
         product_data = scraper.scrape_single_product(url)
         
-        # Bot tamamen patlarsa ama manuel fiyat varsa, manuel veriyle devam etmeyi dene
+        # Bot başarısız olsa bile manuel veri varsa devam et
         if not product_data:
              if manual_price:
                  product_data = {
                      'title': 'Manuel Eklenen Ürün',
-                     'image_url': 'https://via.placeholder.com/300', # Resim yoksa yer tutucu
+                     'image_url': 'https://via.placeholder.com/300', 
                      'platform': 'Manuel',
                      'category': 'Diğer',
-                     'current_price': 0,
-                     'original_price': 0,
-                     'discount_percent': 0
+                     'current_price': 0, 'original_price': 0, 'discount_percent': 0
                  }
              else:
                  return jsonify({'message': 'Ürün bilgileri çekilemedi.'}), 400
         
-        # 2. MANUEL FİYAT KONTROLÜ (BOTU EZME)
+        # 2. MANUEL VERİLERİ ÖNCELİKLİ KULLAN (BOTU EZ)
         if manual_price:
-            try:
-                product_data['current_price'] = float(manual_price)
-                print(f"✏️ Manuel Satış Fiyatı Kullanıldı: {product_data['current_price']}")
+            try: product_data['current_price'] = float(manual_price)
             except: pass
             
         if manual_old_price:
-            try:
-                product_data['original_price'] = float(manual_old_price)
-                print(f"✏️ Manuel Eski Fiyat Kullanıldı: {product_data['original_price']}")
+            try: product_data['original_price'] = float(manual_old_price)
             except: pass
-            
-        # İndirim oranını tekrar hesapla
-        if product_data.get('original_price', 0) > product_data.get('current_price', 0):
-            diff = product_data['original_price'] - product_data['current_price']
-            product_data['discount_percent'] = int((diff / product_data['original_price']) * 100)
-            if product_data['discount_percent'] > 20: 
-                product_data['real_deal_status'] = 'real'
-            else:
-                product_data['real_deal_status'] = 'normal'
-        else:
-             product_data['discount_percent'] = 0
 
-        # 3. Veritabanına kaydet
+        # 3. İNDİRİM ORANI MANTIĞI
+        # Eğer kullanıcı manuel indirim oranı girdiyse, direkt onu kullan
+        if manual_discount:
+            try:
+                product_data['discount_percent'] = int(manual_discount)
+                # Manuel oran girildiyse "Gerçek İndirim" statüsü ver
+                if product_data['discount_percent'] > 20: product_data['real_deal_status'] = 'real'
+            except: pass
+        else:
+            # Girmemişse, fiyatlardan otomatik hesapla
+            if product_data.get('original_price', 0) > product_data.get('current_price', 0):
+                diff = product_data['original_price'] - product_data['current_price']
+                product_data['discount_percent'] = int((diff / product_data['original_price']) * 100)
+                if product_data['discount_percent'] > 20: 
+                    product_data['real_deal_status'] = 'real'
+                else:
+                    product_data['real_deal_status'] = 'normal'
+            else:
+                 if not manual_discount: product_data['discount_percent'] = 0
+
+        # 4. Veritabanına kaydet
         new_product = Product(
             title=product_data.get('title', 'Başlık Yok'),
             platform=product_data.get('platform', 'Diğer'),
@@ -236,7 +240,6 @@ def add_product_via_link():
         db.session.add(new_product)
         db.session.commit()
         
-        # Fiyat geçmişine de ekle
         history = PriceHistory(product_id=new_product.id, price=new_product.current_price)
         db.session.add(history)
         db.session.commit()
