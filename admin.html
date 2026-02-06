@@ -7,44 +7,52 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Segoe UI', sans-serif; background: #f3f4f6; min-height: 100vh; display: flex; }
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+        }
 
         /* Sidebar */
         .sidebar {
             width: 260px;
-            background: #1e1e2f;
+            background: rgba(26, 26, 46, 0.95);
+            backdrop-filter: blur(10px);
             color: #fff;
             display: flex;
             flex-direction: column;
             position: fixed;
             height: 100vh;
-            transition: 0.3s;
+            padding: 20px;
+            box-shadow: 4px 0 15px rgba(0,0,0,0.1);
         }
         .logo {
-            padding: 20px;
             font-size: 1.5rem;
             font-weight: bold;
             color: #fff;
-            border-bottom: 1px solid #2d2d44;
+            padding-bottom: 20px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            margin-bottom: 20px;
             display: flex;
             align-items: center;
             gap: 10px;
         }
-        .logo i { color: #3b82f6; }
-        .menu { list-style: none; padding: 20px 0; }
+        .menu { list-style: none; }
         .menu li a {
             display: flex;
             align-items: center;
-            padding: 15px 25px;
-            color: #a0a0b0;
+            padding: 15px;
+            color: rgba(255,255,255,0.7);
             text-decoration: none;
+            border-radius: 10px;
+            margin-bottom: 5px;
             transition: 0.3s;
             gap: 15px;
         }
         .menu li a:hover, .menu li a.active {
-            background: #2d2d44;
+            background: rgba(255,255,255,0.1);
             color: #fff;
-            border-left: 4px solid #3b82f6;
         }
 
         /* Main Content */
@@ -52,183 +60,146 @@
             flex: 1;
             margin-left: 260px;
             padding: 30px;
-            background: #f3f4f6;
         }
 
         /* Header */
         .header {
+            background: white;
+            padding: 20px 30px;
+            border-radius: 15px;
             display: flex;
             justify-content: space-between;
             align-items: center;
             margin-bottom: 30px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.05);
         }
-        .page-title h1 { font-size: 1.8rem; color: #1f2937; }
-        .page-title span { color: #6b7280; font-size: 0.9rem; }
+        .page-title h1 { font-size: 1.5rem; color: #1f2937; }
         
-        .user-info { display: flex; align-items: center; gap: 15px; }
         .btn-site {
-            background: white;
-            color: #374151;
+            background: #667eea;
+            color: white;
             padding: 10px 20px;
             border-radius: 8px;
             text-decoration: none;
             font-weight: 500;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
             transition: 0.3s;
         }
-        .btn-site:hover { box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        .btn-site:hover { background: #764ba2; }
 
-        /* Stats Cards */
+        /* Stats Grid */
         .stats-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
             gap: 20px;
             margin-bottom: 30px;
         }
         .stat-card {
             background: white;
-            padding: 25px;
-            border-radius: 12px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.02);
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.05);
             display: flex;
             align-items: center;
             gap: 20px;
         }
         .stat-icon {
-            width: 60px;
-            height: 60px;
+            width: 50px; height: 50px;
             border-radius: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            display: flex; align-items: center; justify-content: center;
             font-size: 1.5rem;
         }
-        .stat-info h3 { font-size: 1.8rem; color: #1f2937; margin-bottom: 5px; }
-        .stat-info p { color: #6b7280; font-size: 0.9rem; }
 
         /* Table Section */
         .table-container {
             background: white;
-            border-radius: 12px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.02);
+            border-radius: 15px;
             padding: 25px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.05);
         }
         .table-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
             margin-bottom: 20px;
-            flex-wrap: wrap;
-            gap: 15px;
-        }
-        .search-box {
-            position: relative;
-            width: 300px;
-        }
-        .search-box input {
-            width: 100%;
-            padding: 10px 15px 10px 40px;
-            border: 1px solid #e5e7eb;
-            border-radius: 8px;
-            outline: none;
-        }
-        .search-box i {
-            position: absolute;
-            left: 15px;
-            top: 50%;
-            transform: translateY(-50%);
-            color: #9ca3af;
         }
         .btn-add {
-            background: #3b82f6;
+            background: #10b981;
             color: white;
-            padding: 10px 20px;
+            padding: 12px 25px;
             border: none;
             border-radius: 8px;
             cursor: pointer;
-            font-weight: 500;
-            display: flex;
-            align-items: center;
-            gap: 8px;
+            font-weight: 600;
+            display: flex; align-items: center; gap: 8px;
             transition: 0.3s;
         }
-        .btn-add:hover { background: #2563eb; }
+        .btn-add:hover { background: #059669; }
 
         table { width: 100%; border-collapse: collapse; }
-        th { text-align: left; padding: 15px; color: #6b7280; font-size: 0.85rem; font-weight: 600; border-bottom: 1px solid #f3f4f6; }
-        td { padding: 15px; border-bottom: 1px solid #f3f4f6; color: #374151; font-size: 0.95rem; vertical-align: middle; }
+        th { text-align: left; padding: 15px; color: #6b7280; font-size: 0.9rem; border-bottom: 2px solid #f3f4f6; }
+        td { padding: 15px; border-bottom: 1px solid #f3f4f6; vertical-align: middle; }
+        .product-info { display: flex; align-items: center; gap: 15px; }
+        .product-info img { width: 40px; height: 40px; border-radius: 8px; object-fit: contain; border: 1px solid #eee; }
         
-        .product-cell { display: flex; align-items: center; gap: 15px; }
-        .product-cell img { width: 40px; height: 40px; border-radius: 6px; object-fit: contain; border: 1px solid #eee; }
-        .platform-badge { padding: 4px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; }
+        .badge { padding: 5px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; }
         .badge-hb { background: #fff7ed; color: #c2410c; }
         .badge-ty { background: #fff1f2; color: #e11d48; }
-        .badge-other { background: #f3f4f6; color: #4b5563; }
-        
-        .price { font-weight: 600; color: #111827; }
-        .old-price { font-size: 0.8rem; text-decoration: line-through; color: #9ca3af; margin-left: 5px; }
-        
-        .action-btn {
-            padding: 6px 12px;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            transition: 0.2s;
-            margin-left: 5px;
+
+        .btn-delete {
+            background: #fee2e2; color: #ef4444; border: none;
+            width: 32px; height: 32px; border-radius: 6px;
+            cursor: pointer; transition: 0.2s;
         }
-        .btn-delete { background: #fee2e2; color: #ef4444; }
         .btn-delete:hover { background: #fecaca; }
 
         /* Modal */
         .modal {
-            display: none;
-            position: fixed;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-            background: rgba(0,0,0,0.5);
-            align-items: center;
-            justify-content: center;
-            z-index: 1000;
+            display: none; position: fixed; top: 0; left: 0;
+            width: 100%; height: 100%; background: rgba(0,0,0,0.5);
+            align-items: center; justify-content: center; z-index: 1000;
         }
         .modal.active { display: flex; }
         .modal-content {
-            background: white;
-            padding: 30px;
-            border-radius: 12px;
-            width: 100%;
-            max-width: 500px;
+            background: white; padding: 30px; border-radius: 15px;
+            width: 100%; max-width: 500px;
             animation: slideIn 0.3s ease;
         }
         @keyframes slideIn { from { transform: translateY(-20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 8px; font-weight: 600; color: #374151; font-size: 0.9rem; }
+        .form-input {
+            width: 100%; padding: 12px;
+            border: 1px solid #e5e7eb; border-radius: 8px;
+            font-size: 1rem; outline: none; transition: 0.3s;
+        }
+        .form-input:focus { border-color: #667eea; box-shadow: 0 0 0 3px rgba(102,126,234,0.1); }
         
-        .form-group { margin-bottom: 20px; }
-        .form-group label { display: block; margin-bottom: 8px; color: #374151; font-weight: 500; font-size: 0.9rem; }
-        .form-group input { width: 100%; padding: 12px; border: 1px solid #d1d5db; border-radius: 8px; outline: none; }
-        .form-group input:focus { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,0.1); }
         .row { display: flex; gap: 15px; }
-        
-        .modal-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 30px; }
+        .modal-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
         .btn-cancel { background: #f3f4f6; color: #374151; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; }
-        .btn-save { background: #3b82f6; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; }
+        .btn-save { background: #667eea; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; }
         
         /* Loading */
         .loading-overlay {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(255,255,255,0.8); display: none;
-            align-items: center; justify-content: center;
-            border-radius: 12px;
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255,255,255,0.9); z-index: 2000;
+            display: none; align-items: center; justify-content: center; flex-direction: column;
         }
     </style>
 </head>
 <body>
 
+    <div class="loading-overlay" id="loader">
+        <i class="fas fa-spinner fa-spin fa-3x" style="color: #667eea;"></i>
+        <p style="margin-top: 15px; font-weight: 500; color: #4b5563;">İşleniyor...</p>
+    </div>
+
     <aside class="sidebar">
-        <div class="logo">
-            <i class="fas fa-bolt"></i> İndirimRadar
-        </div>
+        <div class="logo"><i class="fas fa-bolt"></i> İndirimRadar</div>
         <ul class="menu">
             <li><a href="#" class="active"><i class="fas fa-box"></i> Ürünler</a></li>
-            <li><a href="index.html" target="_blank"><i class="fas fa-external-link-alt"></i> Siteyi Görüntüle</a></li>
+            <li><a href="index.html" target="_blank"><i class="fas fa-globe"></i> Siteyi Görüntüle</a></li>
         </ul>
     </aside>
 
@@ -236,62 +207,28 @@
         <div class="header">
             <div class="page-title">
                 <h1>Ürün Yönetimi</h1>
-                <span>Takip edilen ürünleri buradan yönetebilirsiniz.</span>
             </div>
-            <div class="user-info">
-                <a href="index.html" class="btn-site"><i class="fas fa-eye"></i> Siteye Git</a>
-            </div>
+            <button class="btn-add" onclick="openModal()">
+                <i class="fas fa-plus"></i> Yeni Ürün Ekle
+            </button>
         </div>
 
         <div class="stats-grid">
             <div class="stat-card">
-                <div class="stat-icon" style="background: #e0f2fe; color: #0284c7;">
-                    <i class="fas fa-box-open"></i>
-                </div>
-                <div class="stat-info">
-                    <h3 id="totalProducts">0</h3>
-                    <p>Toplam Ürün</p>
-                </div>
+                <div class="stat-icon" style="background: #e0f2fe; color: #0284c7;"><i class="fas fa-box-open"></i></div>
+                <div><h3 id="totalProducts">0</h3><p style="color:#6b7280">Toplam Ürün</p></div>
             </div>
             <div class="stat-card">
-                <div class="stat-icon" style="background: #dcfce7; color: #16a34a;">
-                    <i class="fas fa-check-circle"></i>
-                </div>
-                <div class="stat-info">
-                    <h3 id="activeProducts">0</h3>
-                    <p>Aktif Takip</p>
-                </div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-icon" style="background: #fee2e2; color: #dc2626;">
-                    <i class="fas fa-fire"></i>
-                </div>
-                <div class="stat-info">
-                    <h3 id="discountProducts">0</h3>
-                    <p>İndirimli Ürünler</p>
-                </div>
+                <div class="stat-icon" style="background: #dcfce7; color: #16a34a;"><i class="fas fa-tags"></i></div>
+                <div><h3 id="discountProducts">0</h3><p style="color:#6b7280">İndirimli</p></div>
             </div>
         </div>
 
-        <div class="table-container" style="position: relative;">
-            <div class="loading-overlay" id="loadingOverlay">
-                <i class="fas fa-spinner fa-spin fa-2x" style="color: #3b82f6;"></i>
-            </div>
-            
-            <div class="table-header">
-                <div class="search-box">
-                    <i class="fas fa-search"></i>
-                    <input type="text" id="searchInput" placeholder="Ürün ara..." onkeyup="filterTable()">
-                </div>
-                <button class="btn-add" onclick="openModal()">
-                    <i class="fas fa-plus"></i> Yeni Ürün Ekle
-                </button>
-            </div>
-
+        <div class="table-container">
             <table>
                 <thead>
                     <tr>
-                        <th>Ürün</th>
+                        <th>Ürün Adı</th>
                         <th>Platform</th>
                         <th>Fiyat</th>
                         <th>İndirim</th>
@@ -304,116 +241,102 @@
         </div>
     </main>
 
-    <div class="modal" id="addModal">
+    <div class="modal" id="productModal">
         <div class="modal-content">
-            <h2 style="margin-bottom: 20px; color: #1f2937;">Yeni Ürün Ekle</h2>
+            <h2 style="margin-bottom: 20px; color:#1f2937">Yeni Ürün Ekle</h2>
             
             <div class="form-group">
-                <label>Ürün Linki</label>
-                <input type="text" id="productUrl" placeholder="https://www.hepsiburada.com/...">
+                <label>Ürün Linki (Zorunlu)</label>
+                <input type="text" class="form-input" id="productUrl" placeholder="https://...">
             </div>
 
             <div class="row">
                 <div class="form-group" style="flex:1">
-                    <label>Manuel Satış Fiyatı (TL)</label>
-                    <input type="number" id="manualPrice" placeholder="Örn: 64.99">
+                    <label>Satış Fiyatı (TL)</label>
+                    <input type="number" step="0.01" class="form-input" id="manualPrice" placeholder="Örn: 64.99">
                 </div>
                 <div class="form-group" style="flex:1">
-                    <label>Manuel Eski Fiyat (TL)</label>
-                    <input type="number" id="manualOldPrice" placeholder="Örn: 89.99">
-                </div>
-            </div>
-            
-            <div class="row">
-                <div class="form-group" style="flex:1">
-                    <label>İndirim Oranı (%)</label>
-                    <input type="number" id="manualDiscount" placeholder="Otomatik hesaplanır">
+                    <label>Eski Fiyat (TL)</label>
+                    <input type="number" step="0.01" class="form-input" id="manualOldPrice" placeholder="Örn: 89.99">
                 </div>
             </div>
 
-            <p style="font-size: 0.8rem; color: #6b7280; margin-bottom: 20px;">
-                * Fiyatları boş bırakırsanız bot siteden otomatik çekmeye çalışır.
-            </p>
+            <div class="form-group">
+                <label>İndirim Oranı (%)</label>
+                <input type="number" class="form-input" id="manualDiscount" placeholder="Otomatik hesaplanır, istersen yaz">
+            </div>
+
+            <p style="font-size:0.8rem; color:#6b7280; margin-bottom:20px">* Fiyatları boş bırakırsan bot siteden otomatik çeker.</p>
 
             <div class="modal-footer">
                 <button class="btn-cancel" onclick="closeModal()">İptal</button>
-                <button class="btn-save" onclick="saveProduct()" id="saveBtn">Kaydet</button>
+                <button class="btn-save" onclick="saveProduct()">Kaydet</button>
             </div>
         </div>
     </div>
 
     <script>
         const API_URL = "https://indirimradar-backend-production.up.railway.app";
-        let allProducts = [];
 
         window.onload = loadProducts;
 
-        // Ürünleri Getir
+        function showLoader() { document.getElementById('loader').style.display = 'flex'; }
+        function hideLoader() { document.getElementById('loader').style.display = 'none'; }
+
         async function loadProducts() {
-            document.getElementById('loadingOverlay').style.display = 'flex';
+            showLoader();
             try {
                 const res = await fetch(`${API_URL}/api/products`);
                 const data = await res.json();
-                allProducts = data.products || [];
-                renderTable(allProducts);
-                updateStats(allProducts);
+                renderTable(data.products || []);
+                updateStats(data.products || []);
             } catch (e) {
-                console.error("Hata:", e);
+                console.error(e);
                 alert("Veriler yüklenemedi!");
             } finally {
-                document.getElementById('loadingOverlay').style.display = 'none';
+                hideLoader();
             }
         }
 
-        // Tabloyu Doldur
         function renderTable(products) {
             const tbody = document.getElementById('productTableBody');
             tbody.innerHTML = '';
-
+            
             if(products.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px;">Henüz ürün yok.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px">Henüz ürün yok.</td></tr>';
                 return;
             }
 
             products.forEach(p => {
-                let badgeClass = 'badge-other';
-                if(p.platform === 'Hepsiburada') badgeClass = 'badge-hb';
-                else if(p.platform === 'Trendyol') badgeClass = 'badge-ty';
-
-                const oldPrice = p.original_price > p.current_price 
-                    ? `<span class="old-price">${p.original_price} TL</span>` : '';
-
-                const html = `
+                let badgeClass = p.platform === 'Hepsiburada' ? 'badge-hb' : 'badge-ty';
+                let oldPrice = p.original_price > p.current_price ? `<span style="text-decoration:line-through; color:#9ca3af; font-size:0.8rem; margin-left:5px">${p.original_price} TL</span>` : '';
+                
+                let html = `
                     <tr>
                         <td>
-                            <div class="product-cell">
+                            <div class="product-info">
                                 <img src="${p.image_url}" onerror="this.src='https://via.placeholder.com/40'">
-                                <div style="display:flex; flex-direction:column; gap:2px;">
-                                    <span style="font-weight:500; font-size:0.9rem;">${p.title}</span>
-                                    <a href="${p.url}" target="_blank" style="font-size:0.75rem; color:#3b82f6; text-decoration:none;">Linki Aç ↗</a>
+                                <div>
+                                    <div style="font-weight:500">${p.title}</div>
+                                    <a href="${p.url}" target="_blank" style="font-size:0.75rem; color:#667eea; text-decoration:none">Linki Aç ↗</a>
                                 </div>
                             </div>
                         </td>
-                        <td><span class="platform-badge ${badgeClass}">${p.platform}</span></td>
-                        <td>
-                            <span class="price">${p.current_price} TL</span>
-                            ${oldPrice}
-                        </td>
-                        <td>
-                            ${p.discount_percent > 0 ? `<span style="color:#16a34a; font-weight:600;">%${p.discount_percent}</span>` : '-'}
-                        </td>
-                        <td>
-                            <button class="action-btn btn-delete" onclick="deleteProduct(${p.id})">
-                                <i class="fas fa-trash"></i>
-                            </button>
-                        </td>
+                        <td><span class="badge ${badgeClass}">${p.platform}</span></td>
+                        <td><span style="font-weight:600">${p.current_price} TL</span>${oldPrice}</td>
+                        <td>${p.discount_percent > 0 ? `<span style="color:#10b981; font-weight:bold">%${p.discount_percent}</span>` : '-'}</td>
+                        <td><button class="btn-delete" onclick="deleteProduct(${p.id})"><i class="fas fa-trash"></i></button></td>
                     </tr>
                 `;
                 tbody.innerHTML += html;
             });
         }
 
-        // Ürün Kaydet (Manuel Fiyat Destekli)
+        function updateStats(products) {
+            document.getElementById('totalProducts').innerText = products.length;
+            document.getElementById('discountProducts').innerText = products.filter(p => p.discount_percent > 0).length;
+        }
+
         async function saveProduct() {
             const url = document.getElementById('productUrl').value;
             const price = document.getElementById('manualPrice').value;
@@ -421,16 +344,14 @@
             const discount = document.getElementById('manualDiscount').value;
 
             if(!url) return alert("Lütfen link girin!");
-
-            const btn = document.getElementById('saveBtn');
-            const originalText = btn.innerText;
-            btn.innerText = "Ekleniyor...";
-            btn.disabled = true;
+            
+            closeModal();
+            showLoader();
 
             try {
                 const res = await fetch(`${API_URL}/api/products`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({
                         url: url,
                         manual_price: price ? parseFloat(price) : null,
@@ -438,14 +359,12 @@
                         manual_discount: discount ? parseInt(discount) : null
                     })
                 });
-
+                
                 if(res.ok) {
-                    alert("Ürün başarıyla eklendi!");
-                    closeModal();
+                    alert("✅ Ürün başarıyla eklendi!");
                     document.getElementById('productUrl').value = '';
                     document.getElementById('manualPrice').value = '';
                     document.getElementById('manualOldPrice').value = '';
-                    document.getElementById('manualDiscount').value = '';
                     loadProducts();
                 } else {
                     const d = await res.json();
@@ -454,55 +373,21 @@
             } catch(e) {
                 alert("Sunucu hatası!");
             } finally {
-                btn.innerText = originalText;
-                btn.disabled = false;
+                hideLoader();
             }
         }
 
-        // Ürün Sil
         async function deleteProduct(id) {
-            if(!confirm("Bu ürünü silmek istediğine emin misin?")) return;
-
+            if(!confirm("Silmek istediğine emin misin?")) return;
+            showLoader();
             try {
-                // Backend'de silme endpoint'ine istek atıyoruz.
-                // Not: Backend tarafında admin koruması (token) varsa burası 401 verebilir.
-                // Şimdilik token'sız basit silme varsayımıyla:
-                /* Eğer app.py dosyasında silme işlemi @token_required ile korunuyorsa,
-                   burada Authorization header göndermek gerekir.
-                   Basitlik adına o korumayı kaldırdığını varsayıyorum veya token'ı localStorage'dan alman gerekir.
-                   Şimdilik standart istek:
-                */
-                const res = await fetch(`${API_URL}/api/products/${id}`, {
-                    method: 'DELETE',
-                    // headers: { 'Authorization': 'Bearer ...' } // Eğer token varsa
-                });
-
-                if(res.ok) {
-                    loadProducts();
-                } else {
-                    alert("Silinemedi. Yetki gerekebilir.");
-                }
-            } catch(e) { alert("Hata oluştu"); }
+                await fetch(`${API_URL}/api/products/${id}`, { method: 'DELETE' });
+                loadProducts();
+            } catch(e) { alert("Silinemedi!"); } finally { hideLoader(); }
         }
 
-        // İstatistikleri Güncelle
-        function updateStats(products) {
-            document.getElementById('totalProducts').innerText = products.length;
-            document.getElementById('activeProducts').innerText = products.length; // Şimdilik hepsi aktif
-            const discounted = products.filter(p => p.discount_percent > 0).length;
-            document.getElementById('discountProducts').innerText = discounted;
-        }
-
-        // Arama Filtresi
-        function filterTable() {
-            const term = document.getElementById('searchInput').value.toLowerCase();
-            const filtered = allProducts.filter(p => p.title.toLowerCase().includes(term));
-            renderTable(filtered);
-        }
-
-        // Modal İşlemleri
-        function openModal() { document.getElementById('addModal').classList.add('active'); }
-        function closeModal() { document.getElementById('addModal').classList.remove('active'); }
+        function openModal() { document.getElementById('productModal').classList.add('active'); }
+        function closeModal() { document.getElementById('productModal').classList.remove('active'); }
     </script>
 </body>
 </html>
