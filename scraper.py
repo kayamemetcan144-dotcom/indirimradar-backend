@@ -40,6 +40,7 @@ class ProductScraper:
         
         if 'hepsiburada' in url: data['platform'] = 'Hepsiburada'
         elif 'trendyol' in url: data['platform'] = 'Trendyol'
+        elif 'n11' in url: data['platform'] = 'N11'
 
         driver = None
         try:
@@ -51,6 +52,7 @@ class ProductScraper:
             # JSON-LD (Öncelikli)
             for s in soup.find_all('script', type='application/ld+json'):
                 try:
+                    if not s.text: continue
                     j = json.loads(s.text)
                     if isinstance(j, list): j = j[0]
                     if 'offers' in j:
@@ -73,7 +75,7 @@ class ProductScraper:
                         data['current_price'] = float(p)
                         break
 
-            # Eski Fiyat
+            # Eski Fiyat ve İndirim
             if data['current_price'] > 0:
                 orig_matches = re.findall(r'"originalPrice":\s*([\d\.]+)', driver.page_source)
                 valid_orig = [float(x) for x in orig_matches if float(x) > data['current_price']]
