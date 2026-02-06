@@ -1,49 +1,26 @@
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
-from datetime import datetime, timedelta
-from functools import wraps
+from datetime import datetime
 from werkzeug.security import generate_password_hash, check_password_hash
-from sqlalchemy import text
-import jwt
 import os
-
-# Scraper'ı çağırıyoruz
 from scraper import ProductScraper 
 
 app = Flask(__name__)
 
-# CORS Configuration
+# Ayarlar
 allowed_origins = os.getenv('ALLOWED_ORIGINS', '*').split(',')
 CORS(app, resources={r"/api/*": {"origins": "*"}})
 
-# Configuration
-app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production')
-app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', app.config['SECRET_KEY'])
-
-# Database Configuration
+app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret')
 database_url = os.getenv('DATABASE_URL', 'sqlite:///indirimradar.db')
-if database_url.startswith('postgres://'):
-    database_url = database_url.replace('postgres://', 'postgresql://', 1)
-
+if database_url.startswith('postgres://'): database_url = database_url.replace('postgres://', 'postgresql://', 1)
 app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {'pool_pre_ping': True, 'pool_recycle': 300}
 
 db = SQLAlchemy(app)
 
-# ==================== MODELS ====================
-
-class User(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    email = db.Column(db.String(120), unique=True, nullable=False)
-    password = db.Column(db.String(200), nullable=False)
-    is_premium = db.Column(db.Boolean, default=False)
-    is_admin = db.Column(db.Boolean, default=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    favorites = db.relationship('Favorite', backref='user', lazy=True, cascade='all, delete-orphan')
-    alerts = db.relationship('PriceAlert', backref='user', lazy=True, cascade='all, delete-orphan')
-
+# --- MODELLER ---
 class Product(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(500), nullable=False)
@@ -56,8 +33,6 @@ class Product(db.Model):
     product_url = db.Column(db.String(1000), nullable=False)
     real_deal_status = db.Column(db.String(20), default='normal')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    price_history = db.relationship('PriceHistory', backref='product', lazy=True)
 
 class PriceHistory(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -65,110 +40,36 @@ class PriceHistory(db.Model):
     price = db.Column(db.Float, nullable=False)
     recorded_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-class Favorite(db.Model):
+class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    product_id = db.Column(db.Integer, db.ForeignKey('product.id'), nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    email = db.Column(db.String(120), unique=True, nullable=False)
+    password = db.Column(db.String(200), nullable=False)
+    is_admin = db.Column(db.Boolean, default=False)
+    # İlişkiler (Gerekirse)
+    # favorites = ...
 
-class PriceAlert(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    product_id = db.Column(db.Integer, db.ForeignKey('product.id'), nullable=False)
-    target_price = db.Column(db.Float, nullable=False)
-    is_active = db.Column(db.Boolean, default=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-
-# ==================== AUTH DECORATOR ====================
-
-def token_required(f):
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        token = request.headers.get('Authorization')
-        if not token: return jsonify({'message': 'Token is missing'}), 401
-        try:
-            token = token.replace('Bearer ', '')
-            data = jwt.decode(token, app.config['SECRET_KEY'], algorithms=["HS256"])
-            current_user = User.query.get(data['user_id'])
-            if not current_user: return jsonify({'message': 'User no longer exists'}), 401
-        except Exception as e: return jsonify({'message': 'Auth error', 'error': str(e)}), 401
-        return f(current_user, *args, **kwargs)
-    return decorated
-
-def admin_required(f):
-    @wraps(f)
-    def decorated(current_user, *args, **kwargs):
-        if not current_user.is_admin: return jsonify({'message': 'Admin required'}), 403
-        return f(current_user, *args, **kwargs)
-    return decorated
-
-# ==================== AUTH ROUTES ====================
-
-@app.route('/api/auth/register', methods=['POST'])
-def register():
-    try:
-        data = request.get_json()
-        if not data or 'email' not in data or 'password' not in data:
-            return jsonify({'message': 'Email and password required'}), 400
-        
-        email = data['email'].strip().lower()
-        if User.query.filter_by(email=email).first():
-            return jsonify({'message': 'User already exists'}), 400
-        
-        new_user = User(email=email, password=generate_password_hash(data['password'], method='pbkdf2:sha256'))
-        db.session.add(new_user)
-        db.session.commit()
-        
-        token = jwt.encode({'user_id': new_user.id, 'exp': datetime.utcnow() + timedelta(days=30)}, app.config['SECRET_KEY'], algorithm="HS256")
-        return jsonify({'token': token, 'user': {'id': new_user.id, 'email': new_user.email}}), 201
-    except Exception as e: return jsonify({'message': 'Error', 'error': str(e)}), 500
-
-@app.route('/api/auth/login', methods=['POST'])
-def login():
-    try:
-        data = request.get_json()
-        if not data or 'email' not in data or 'password' not in data: return jsonify({'message': 'Missing data'}), 400
-        
-        user = User.query.filter_by(email=data['email'].strip().lower()).first()
-        if not user or not check_password_hash(user.password, data['password']):
-            return jsonify({'message': 'Invalid credentials'}), 401
-        
-        token = jwt.encode({'user_id': user.id, 'exp': datetime.utcnow() + timedelta(days=30)}, app.config['SECRET_KEY'], algorithm="HS256")
-        return jsonify({'token': token, 'user': {'id': user.id, 'email': user.email, 'is_admin': user.is_admin}})
-    except Exception as e: return jsonify({'message': 'Error', 'error': str(e)}), 500
-
-# ==================== PRODUCT ROUTES ====================
+# --- ROTALAR ---
 
 @app.route('/api/products', methods=['GET'])
 def get_products():
     page = int(request.args.get('page', 1))
     products = Product.query.order_by(Product.id.desc()).paginate(page=page, per_page=20, error_out=False)
-    
     return jsonify({
         'products': [{
-            'id': p.id,
-            'title': p.title,
-            'platform': p.platform,
-            'current_price': p.current_price,
-            'original_price': p.original_price,
-            'discount_percent': p.discount_percent,
-            'image_url': p.image_url,
-            'url': p.product_url,
-            'real_deal_status': p.real_deal_status
-        } for p in products.items],
-        'total': products.total,
-        'pages': products.pages,
-        'current_page': products.page
+            'id': p.id, 'title': p.title, 'platform': p.platform,
+            'current_price': p.current_price, 'original_price': p.original_price,
+            'discount_percent': p.discount_percent, 'image_url': p.image_url,
+            'url': p.product_url, 'real_deal_status': p.real_deal_status
+        } for p in products.items]
     })
 
-# --- GÜNCELLENMİŞ MANUEL EKLEME FONKSİYONU ---
+# Manuel Fiyat Destekleyen Ekleme Fonksiyonu
 @app.route('/api/products', methods=['POST'])
 def add_product_via_link():
     data = request.get_json()
     url = data.get('url')
-    manual_price = data.get('manual_price')        # Manuel Satış Fiyatı
-    manual_old_price = data.get('manual_old_price') # Manuel Eski Fiyat
-    manual_discount = data.get('manual_discount')   # Manuel İndirim Oranı (YENİ)
+    manual_price = data.get('manual_price')        
+    manual_old_price = data.get('manual_old_price')
     
     if not url: return jsonify({'message': 'URL gerekli'}), 400
 
@@ -176,55 +77,33 @@ def add_product_via_link():
     if existing: return jsonify({'message': 'Bu ürün zaten takip ediliyor', 'id': existing.id}), 200
 
     try:
-        print(f"🕵️‍♂️ Scraping başlatılıyor: {url}")
-        
-        # 1. Bot Veriyi Çekmeye Çalışsın
+        # Bot veriyi çekmeye çalışır (Resim vb. için)
         scraper = ProductScraper(headless=True)
         product_data = scraper.scrape_single_product(url)
         
-        # Bot başarısız olsa bile manuel veri varsa devam et
+        # Bot başarısız olsa bile manuel fiyat varsa devam et
         if not product_data:
              if manual_price:
-                 product_data = {
-                     'title': 'Manuel Eklenen Ürün',
-                     'image_url': 'https://via.placeholder.com/300', 
-                     'platform': 'Manuel',
-                     'category': 'Diğer',
-                     'current_price': 0, 'original_price': 0, 'discount_percent': 0
-                 }
+                 product_data = {'title': 'Manuel Ürün', 'image_url': '', 'platform': 'Manuel', 'category': 'Diğer', 'current_price': 0, 'original_price': 0}
              else:
                  return jsonify({'message': 'Ürün bilgileri çekilemedi.'}), 400
         
-        # 2. MANUEL VERİLERİ ÖNCELİKLİ KULLAN (BOTU EZ)
-        if manual_price:
-            try: product_data['current_price'] = float(manual_price)
-            except: pass
+        # MANUEL FİYAT VARSA BOTU EZ
+        if manual_price: 
+            product_data['current_price'] = float(manual_price)
+            print(f"✏️ Manuel Fiyat Kullanıldı: {manual_price}")
+
+        if manual_old_price: 
+            product_data['original_price'] = float(manual_old_price)
             
-        if manual_old_price:
-            try: product_data['original_price'] = float(manual_old_price)
-            except: pass
-
-        # 3. İNDİRİM ORANI MANTIĞI
-        # Eğer kullanıcı manuel indirim oranı girdiyse, direkt onu kullan
-        if manual_discount:
-            try:
-                product_data['discount_percent'] = int(manual_discount)
-                # Manuel oran girildiyse "Gerçek İndirim" statüsü ver
-                if product_data['discount_percent'] > 20: product_data['real_deal_status'] = 'real'
-            except: pass
+        # İndirim Hesabı (Otomatik)
+        if product_data.get('original_price', 0) > product_data.get('current_price', 0):
+            diff = product_data['original_price'] - product_data['current_price']
+            product_data['discount_percent'] = int((diff / product_data['original_price']) * 100)
+            if product_data['discount_percent'] > 20: product_data['real_deal_status'] = 'real'
         else:
-            # Girmemişse, fiyatlardan otomatik hesapla
-            if product_data.get('original_price', 0) > product_data.get('current_price', 0):
-                diff = product_data['original_price'] - product_data['current_price']
-                product_data['discount_percent'] = int((diff / product_data['original_price']) * 100)
-                if product_data['discount_percent'] > 20: 
-                    product_data['real_deal_status'] = 'real'
-                else:
-                    product_data['real_deal_status'] = 'normal'
-            else:
-                 if not manual_discount: product_data['discount_percent'] = 0
+            product_data['discount_percent'] = 0
 
-        # 4. Veritabanına kaydet
         new_product = Product(
             title=product_data.get('title', 'Başlık Yok'),
             platform=product_data.get('platform', 'Diğer'),
@@ -251,34 +130,18 @@ def add_product_via_link():
         return jsonify({'message': 'Sunucu hatası', 'error': str(e)}), 500
 
 @app.route('/api/products/<int:id>', methods=['DELETE'])
-@token_required
-@admin_required
-def delete_product(current_user, id):
+def delete_product(id):
     product = Product.query.get_or_404(id)
     PriceHistory.query.filter_by(product_id=id).delete()
-    Favorite.query.filter_by(product_id=id).delete()
-    PriceAlert.query.filter_by(product_id=id).delete()
     db.session.delete(product)
     db.session.commit()
-    return jsonify({'message': 'Ürün silindi'})
-
-# ==================== INITIALIZE ====================
+    return jsonify({'message': 'Silindi'})
 
 def init_db():
     with app.app_context():
         db.create_all()
-        if not User.query.filter_by(email='admin@indirimradar.com').first():
-            admin = User(
-                email='admin@indirimradar.com',
-                password=generate_password_hash('Admin123!', method='pbkdf2:sha256'),
-                is_admin=True
-            )
-            db.session.add(admin)
-            db.session.commit()
-            print("✅ Admin oluşturuldu.")
 
 init_db()
 
 if __name__ == '__main__':
-    port = int(os.getenv('PORT', 5000))
-    app.run(host='0.0.0.0', port=port)
+    app.run(host='0.0.0.0', port=int(os.getenv('PORT', 5000)))
