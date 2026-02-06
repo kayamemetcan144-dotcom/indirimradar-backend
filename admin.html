@@ -3,112 +3,46 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Yönetici Paneli - İndirimRadar</title>
+    <title>Yönetici Paneli</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
-        :root { --primary: #111827; --secondary: #2563eb; --bg: #f3f4f6; }
-        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); margin: 0; display: flex; flex-direction: column; min-height: 100vh; }
-        
-        .navbar { background: white; padding: 1rem 2rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center; }
-        .logo { font-size: 1.2rem; font-weight: bold; color: var(--primary); display: flex; align-items: center; gap: 10px; }
-        .btn-site { text-decoration: none; color: #666; font-size: 0.9rem; border: 1px solid #ddd; padding: 5px 15px; border-radius: 5px; }
-        
-        .container { max-width: 600px; margin: 3rem auto; padding: 0 1rem; flex: 1; }
-        .admin-card { background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
-        .card-header { margin-bottom: 2rem; text-align: center; }
-        
-        .form-group { margin-bottom: 1.5rem; }
-        .form-group label { display: block; font-weight: 600; font-size: 0.9rem; color: #374151; margin-bottom: 8px; }
-        .main-input { width: 100%; padding: 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 1rem; box-sizing: border-box; }
-        
-        .price-row { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
-        
-        .btn-submit { width: 100%; padding: 14px; background: var(--secondary); color: white; border: none; border-radius: 8px; font-size: 1rem; font-weight: 600; cursor: pointer; transition: background 0.2s; }
-        .btn-submit:hover { background: #1d4ed8; }
-        .btn-submit:disabled { background: #9ca3af; cursor: not-allowed; }
-        
-        .note { font-size: 0.8rem; color: #9ca3af; margin-top: 10px; display: block; text-align: center; }
+        body { font-family: sans-serif; background: #f3f4f6; display: flex; justify-content: center; padding-top: 50px; }
+        .card { background: white; padding: 30px; border-radius: 10px; width: 100%; max-width: 500px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        h2 { text-align: center; color: #333; }
+        input { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; }
+        button { width: 100%; padding: 12px; background: #2563eb; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
+        button:hover { background: #1d4ed8; }
+        .row { display: flex; gap: 10px; }
     </style>
 </head>
 <body>
-
-    <nav class="navbar">
-        <div class="logo"><i class="fas fa-user-shield"></i> Yönetici Paneli</div>
-        <a href="index.html" class="btn-site">Siteye Dön <i class="fas fa-external-link-alt"></i></a>
-    </nav>
-
-    <div class="container">
-        <div class="admin-card">
-            <div class="card-header">
-                <h2>Ürün Ekle & Düzenle</h2>
-                <p>Link gir, istersen fiyatı elle belirle.</p>
-            </div>
-
-            <div class="form-group">
-                <label>Ürün Linki (Zorunlu)</label>
-                <input type="text" id="productUrl" class="main-input" placeholder="https://www.hepsiburada.com/...">
-            </div>
-
-            <div class="price-row">
-                <div class="form-group">
-                    <label>Satış Fiyatı (TL)</label>
-                    <input type="number" step="0.01" id="manualPrice" class="main-input" placeholder="Örn: 64.99">
-                </div>
-                <div class="form-group">
-                    <label>Eski Fiyat (TL)</label>
-                    <input type="number" step="0.01" id="manualOldPrice" class="main-input" placeholder="Örn: 89.99">
-                </div>
-            </div>
-
-            <button onclick="addProduct()" class="btn-submit">Ürünü Kaydet</button>
-            <span class="note">* Fiyatları boş bırakırsan bot siteden otomatik çeker.</span>
+    <div class="card">
+        <h2>Ürün Ekle</h2>
+        <input type="text" id="url" placeholder="Ürün Linki (Zorunlu)">
+        <div class="row">
+            <input type="number" id="price" placeholder="Satış Fiyatı (Opsiyonel)">
+            <input type="number" id="oldPrice" placeholder="Eski Fiyat (Opsiyonel)">
         </div>
+        <button onclick="add()">Ekle</button>
     </div>
 
     <script>
-        // Railway URL'ni buraya yaz
-        const API_URL = "https://indirimradar-backend-production.up.railway.app"; 
+        async function add() {
+            const url = document.getElementById('url').value;
+            const price = document.getElementById('price').value;
+            const oldPrice = document.getElementById('oldPrice').value;
 
-        async function addProduct() {
-            const url = document.getElementById('productUrl').value;
-            const manualPrice = document.getElementById('manualPrice').value;
-            const manualOldPrice = document.getElementById('manualOldPrice').value;
-
-            if (!url) return alert("Lütfen bir ürün linki yapıştırın!");
-
-            const btn = document.querySelector('.btn-submit');
-            const originalText = btn.innerText;
-            btn.innerText = "İşleniyor...";
-            btn.disabled = true;
+            if(!url) return alert("Link gir!");
 
             try {
-                const res = await fetch(`${API_URL}/api/products`, {
+                const res = await fetch('https://indirimradar-backend-production.up.railway.app/api/products', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        url: url,
-                        manual_price: manualPrice ? parseFloat(manualPrice) : null,
-                        manual_old_price: manualOldPrice ? parseFloat(manualOldPrice) : null
-                    })
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ url, manual_price: price, manual_old_price: oldPrice })
                 });
-                
-                const data = await res.json();
-
-                if (res.ok) {
-                    alert(`✅ Başarılı!\nÜrün: ${data.product.title}\nFiyat: ${data.product.current_price} TL`);
-                    document.getElementById('productUrl').value = '';
-                    document.getElementById('manualPrice').value = '';
-                    document.getElementById('manualOldPrice').value = '';
-                } else {
-                    alert("❌ Hata: " + (data.message || "Bilinmeyen hata"));
-                }
-            } catch (e) {
-                console.error(e);
-                alert("Sunucuya bağlanılamadı!");
-            } finally {
-                btn.innerText = originalText;
-                btn.disabled = false;
-            }
+                if(res.ok) alert("Eklendi!");
+                else alert("Hata!");
+            } catch(e) { alert("Sunucu hatası"); }
         }
     </script>
 </body>
