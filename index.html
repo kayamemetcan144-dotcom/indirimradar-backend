@@ -6,392 +6,217 @@
     <title>İndirimRadar - Fırsatları Yakala</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
-        /* --- CANLI RENK PALETİ --- */
         :root { 
-            --primary: #FF6600; /* Canlı Turuncu (Fırsat Rengi) */
-            --secondary: #2c3e50; /* Koyu Lacivert (Yazılar) */
-            --accent: #3498db; /* Canlı Mavi (Butonlar) */
-            --bg: #fdfdfd; 
-            --white: #ffffff;
+            --primary: #FF6600; /* Canlı Turuncu */
+            --secondary: #1e293b; /* Koyu Lacivert */
+            --bg: #f8fafc; 
         }
         
         body { font-family: 'Segoe UI', sans-serif; background: var(--bg); margin: 0; color: #333; }
         
-        /* --- NAVBAR (ÜST MENÜ) --- */
+        /* Navbar */
         .navbar { 
-            background: var(--white); 
+            background: white; 
             padding: 15px 5%; 
             display: flex; 
             align-items: center; 
             justify-content: space-between; 
-            box-shadow: 0 2px 10px rgba(0,0,0,0.05); 
-            position: sticky; 
-            top: 0; 
-            z-index: 1000;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05); 
+            position: sticky; top: 0; z-index: 100;
         }
 
-        .logo { 
-            font-size: 1.8rem; 
-            font-weight: 800; 
-            color: var(--primary); 
-            text-decoration: none; 
-            display: flex; 
-            align-items: center; 
-            gap: 8px;
-        }
-
+        .logo { font-size: 1.6rem; font-weight: 800; color: var(--primary); text-decoration: none; display: flex; align-items: center; gap: 8px; }
+        
         /* Arama Çubuğu */
-        .search-wrapper {
-            flex: 1;
-            margin: 0 40px;
-            position: relative;
-        }
-        .search-bar {
+        .search-container { flex: 1; max-width: 500px; margin: 0 20px; position: relative; }
+        .search-input {
             width: 100%;
             padding: 12px 20px;
             padding-left: 45px;
-            border: 2px solid #eee;
+            border: 2px solid #e2e8f0;
             border-radius: 50px;
             font-size: 1rem;
             transition: 0.3s;
-            background: #f9f9f9;
+            background: #f1f5f9;
         }
-        .search-bar:focus {
-            outline: none;
-            border-color: var(--primary);
-            background: white;
-            box-shadow: 0 0 0 4px rgba(255, 102, 0, 0.1);
-        }
-        .search-icon {
-            position: absolute;
-            left: 15px;
-            top: 50%;
-            transform: translateY(-50%);
-            color: #aaa;
-        }
+        .search-input:focus { border-color: var(--primary); background: white; outline: none; }
+        .search-icon { position: absolute; left: 15px; top: 50%; transform: translateY(-50%); color: #94a3b8; }
 
-        /* Giriş Butonu */
         .btn-login { 
-            background: var(--secondary); 
-            color: white; 
-            padding: 10px 25px; 
-            border-radius: 50px; 
-            text-decoration: none; 
-            font-weight: 600; 
-            transition: 0.3s;
-            display: flex;
-            align-items: center;
-            gap: 8px;
+            background: var(--secondary); color: white; padding: 10px 20px; 
+            border-radius: 30px; text-decoration: none; font-weight: 600; 
+            font-size: 0.9rem; transition: 0.3s; 
         }
-        .btn-login:hover { background: var(--primary); transform: translateY(-2px); }
+        .btn-login:hover { background: var(--primary); }
 
-        /* --- KATEGORİLER (YATAY KAYDIRMA) --- */
-        .category-nav {
-            background: white;
-            padding: 15px 5%;
-            border-bottom: 1px solid #eee;
-            overflow-x: auto;
-            white-space: nowrap;
-            display: flex;
-            gap: 15px;
-            /* Scrollbar gizleme */
-            -ms-overflow-style: none;  
-            scrollbar-width: none;  
+        /* Kategoriler */
+        .category-scroll {
+            display: flex; gap: 10px; padding: 15px 5%; overflow-x: auto; 
+            background: white; border-bottom: 1px solid #e2e8f0;
+            white-space: nowrap; scrollbar-width: none;
         }
-        .category-nav::-webkit-scrollbar { display: none; }
+        .category-scroll::-webkit-scrollbar { display: none; }
+        
+        .cat-btn {
+            padding: 8px 16px; background: #f1f5f9; border-radius: 20px;
+            color: var(--secondary); text-decoration: none; font-size: 0.9rem;
+            font-weight: 500; transition: 0.2s; cursor: pointer;
+        }
+        .cat-btn:hover, .cat-btn.active { background: var(--primary); color: white; }
 
-        .cat-item {
-            display: inline-block;
-            padding: 8px 16px;
-            border-radius: 20px;
-            background: #f0f2f5;
-            color: var(--secondary);
-            text-decoration: none;
-            font-size: 0.95rem;
-            font-weight: 500;
-            transition: 0.3s;
-            cursor: pointer;
-        }
-        .cat-item:hover, .cat-item.active {
-            background: var(--primary);
-            color: white;
-            box-shadow: 0 4px 10px rgba(255, 102, 0, 0.3);
-        }
-
-        /* --- ÜRÜN VİTRİNİ --- */
+        /* Ürün Vitrini */
         .container { padding: 2rem 5%; }
-        
-        .section-title {
-            font-size: 1.5rem;
-            color: var(--secondary);
-            margin-bottom: 20px;
-            font-weight: 700;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        
-        .products-grid { 
-            display: grid; 
-            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); 
-            gap: 25px; 
-        }
+        .section-title { font-size: 1.4rem; font-weight: 700; margin-bottom: 20px; color: var(--secondary); display: flex; align-items: center; gap: 10px; }
 
+        .products-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 25px; }
+        
         .product-card { 
-            background: white; 
-            border-radius: 16px; 
-            overflow: hidden; 
-            border: 1px solid #eee;
-            transition: 0.3s; 
-            position: relative; 
-            display: flex;
-            flex-direction: column;
+            background: white; border-radius: 12px; overflow: hidden; 
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04); transition: transform 0.3s; 
+            position: relative; display: flex; flex-direction: column;
         }
-        .product-card:hover { 
-            transform: translateY(-8px); 
-            box-shadow: 0 15px 30px rgba(0,0,0,0.08); 
-            border-color: transparent;
-        }
-        
-        /* İndirim Rozeti */
+        .product-card:hover { transform: translateY(-5px); box-shadow: 0 10px 20px rgba(0,0,0,0.08); }
+
         .badge { 
-            position: absolute; 
-            top: 15px; 
-            right: 15px; 
-            background: #ef4444; 
-            color: white; 
-            padding: 6px 12px; 
-            border-radius: 12px; 
-            font-weight: bold; 
-            font-size: 0.85rem; 
-            box-shadow: 0 4px 6px rgba(239, 68, 68, 0.3);
-            z-index: 2; 
+            position: absolute; top: 10px; right: 10px; background: #ef4444; 
+            color: white; padding: 5px 10px; border-radius: 8px; 
+            font-weight: bold; font-size: 0.8rem; z-index: 2; 
         }
 
-        .card-img-wrapper {
-            width: 100%;
-            height: 220px;
-            padding: 20px;
-            box-sizing: border-box;
-            background: white;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .card-img { 
-            max-height: 100%; 
-            max-width: 100%; 
-            object-fit: contain; 
-            transition: 0.3s;
-        }
-        .product-card:hover .card-img { transform: scale(1.05); }
-
-        .card-body { padding: 20px; flex: 1; display: flex; flex-direction: column; }
+        .card-img { width: 100%; height: 200px; object-fit: contain; padding: 20px; box-sizing: border-box; }
+        .card-body { padding: 15px; flex: 1; display: flex; flex-direction: column; }
         
-        .card-category { font-size: 0.8rem; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 5px; }
+        .card-cat { font-size: 0.75rem; color: #94a3b8; text-transform: uppercase; margin-bottom: 5px; }
+        .card-title { font-size: 0.95rem; font-weight: 600; color: #334155; margin-bottom: 10px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; height: 2.8em; }
         
-        .card-title { 
-            font-size: 1rem; 
-            font-weight: 600; 
-            margin-bottom: 15px; 
-            color: #2c3e50; 
-            line-height: 1.4;
-            display: -webkit-box; 
-            -webkit-line-clamp: 2; 
-            -webkit-box-orient: vertical; 
-            overflow: hidden; 
-            height: 2.8em; 
-        }
-        
-        .price-box { margin-top: auto; display: flex; align-items: center; justify-content: space-between; }
-        
-        .prices { display: flex; flex-direction: column; }
-        .current-price { font-size: 1.4rem; font-weight: 800; color: var(--primary); }
-        .old-price { text-decoration: line-through; color: #bbb; font-size: 0.9rem; margin-bottom: 2px; }
+        .price-row { margin-top: auto; display: flex; justify-content: space-between; align-items: center; }
+        .price-box { display: flex; flex-direction: column; }
+        .old-price { font-size: 0.85rem; text-decoration: line-through; color: #cbd5e1; }
+        .current-price { font-size: 1.3rem; font-weight: 800; color: var(--primary); }
         
         .btn-go { 
-            width: 40px; 
-            height: 40px; 
-            border-radius: 50%; 
-            background: #f0f2f5; 
-            color: var(--primary); 
-            display: flex; 
-            align-items: center; 
-            justify-content: center; 
-            text-decoration: none; 
-            transition: 0.2s; 
+            width: 35px; height: 35px; border-radius: 50%; background: #f1f5f9; 
+            display: flex; align-items: center; justify-content: center; 
+            color: var(--secondary); text-decoration: none; transition: 0.2s;
         }
         .btn-go:hover { background: var(--primary); color: white; }
 
-        .loading { grid-column: 1 / -1; text-align: center; padding: 4rem; color: #999; font-size: 1.2rem; }
-        .no-results { grid-column: 1 / -1; text-align: center; padding: 3rem; color: #666; display: none; }
+        .loading { text-align: center; padding: 3rem; color: #94a3b8; width: 100%; }
 
-        /* Mobil Uyum */
         @media (max-width: 768px) {
             .navbar { flex-wrap: wrap; gap: 10px; padding: 15px; }
-            .logo { order: 1; }
-            .btn-login { order: 2; padding: 8px 15px; font-size: 0.9rem; }
-            .search-wrapper { order: 3; width: 100%; margin: 10px 0 0 0; }
-            .section-title { justify-content: center; }
+            .search-container { order: 3; min-width: 100%; margin: 0; }
         }
     </style>
 </head>
 <body>
 
     <nav class="navbar">
-        <a href="#" class="logo">
-            <i class="fas fa-bolt"></i> İndirimRadar
-        </a>
-
-        <div class="search-wrapper">
+        <a href="#" class="logo"><i class="fas fa-bolt"></i> İndirimRadar</a>
+        
+        <div class="search-container">
             <i class="fas fa-search search-icon"></i>
-            <input type="text" class="search-bar" id="searchInput" placeholder="Ürün, marka veya kategori ara..." onkeyup="filterProducts()">
+            <input type="text" class="search-input" id="searchInput" placeholder="Ürün, kategori veya marka ara..." onkeyup="filterProducts()">
         </div>
 
-        <a href="#" class="btn-login"><i class="fas fa-user"></i> Müşteri Girişi</a>
+        <a href="#" class="btn-login"><i class="fas fa-user-circle"></i> Giriş Yap</a>
     </nav>
 
-    <div class="category-nav" id="categoryList">
-        <div class="cat-item active" onclick="filterByCategory('all')">Tümü</div>
-        <div class="cat-item" onclick="filterByCategory('Elektronik')">Elektronik</div>
-        <div class="cat-item" onclick="filterByCategory('Ev, Yaşam')">Ev, Yaşam</div>
-        <div class="cat-item" onclick="filterByCategory('Anne Bebek')">Anne Bebek</div>
-        <div class="cat-item" onclick="filterByCategory('Telefon')">Cep Telefonu</div>
-        <div class="cat-item" onclick="filterByCategory('Ayakkabı')">Ayakkabı, Çanta</div>
-        <div class="cat-item" onclick="filterByCategory('Kitap')">Kitap, Hobi</div>
-        <div class="cat-item" onclick="filterByCategory('Kozmetik')">Kozmetik</div>
-        <div class="cat-item" onclick="filterByCategory('Moda')">Moda</div>
-        <div class="cat-item" onclick="filterByCategory('Oto')">Otomobil</div>
-        <div class="cat-item" onclick="filterByCategory('Oyun')">Oyun, Konsol</div>
-        <div class="cat-item" onclick="filterByCategory('Spor')">Spor, Outdoor</div>
-        <div class="cat-item" onclick="filterByCategory('Süpermarket')">Süpermarket</div>
+    <div class="category-scroll">
+        <div class="cat-btn active" onclick="filterBy('all')">Tümü</div>
+        <div class="cat-btn" onclick="filterBy('Elektronik')">Elektronik</div>
+        <div class="cat-btn" onclick="filterBy('Ev')">Ev, Yaşam</div>
+        <div class="cat-btn" onclick="filterBy('Anne')">Anne Bebek</div>
+        <div class="cat-btn" onclick="filterBy('Telefon')">Cep Telefonu</div>
+        <div class="cat-btn" onclick="filterBy('Ayakkabı')">Ayakkabı, Çanta</div>
+        <div class="cat-btn" onclick="filterBy('Kitap')">Kitap, Hobi</div>
+        <div class="cat-btn" onclick="filterBy('Kozmetik')">Kozmetik</div>
+        <div class="cat-btn" onclick="filterBy('Moda')">Moda</div>
+        <div class="cat-btn" onclick="filterBy('Oto')">Otomobil</div>
+        <div class="cat-btn" onclick="filterBy('Spor')">Spor, Outdoor</div>
+        <div class="cat-btn" onclick="filterBy('Süpermarket')">Süpermarket</div>
     </div>
 
     <div class="container">
-        <div class="section-title">
-            <i class="fas fa-fire" style="color: var(--primary);"></i> Günün Fırsatları
-        </div>
-
+        <div class="section-title"><i class="fas fa-fire-alt" style="color:#ef4444"></i> Günün Fırsatları</div>
         <div class="products-grid" id="products-container">
-            <div class="loading">
-                <i class="fas fa-spinner fa-spin"></i> Fırsatlar yükleniyor...
-            </div>
-        </div>
-        <div class="no-results" id="noResults">
-            <i class="fas fa-search" style="font-size: 2rem; margin-bottom: 10px; display:block;"></i>
-            Aradığınız kriterde ürün bulunamadı.
+            <div class="loading">Fırsatlar yükleniyor...</div>
         </div>
     </div>
 
     <script>
         // API URL (Railway)
         const API_URL = "https://indirimradar-backend-production.up.railway.app"; 
-        
-        let allProducts = []; // Tüm ürünleri burada tutacağız (Arama için)
+        let allProducts = [];
 
         window.onload = loadProducts;
 
-        // Ürünleri Çek
         async function loadProducts() {
             const container = document.getElementById('products-container');
-            
             try {
                 const res = await fetch(`${API_URL}/api/products`);
                 const data = await res.json();
-                
-                container.innerHTML = ''; // Loading'i temizle
+                container.innerHTML = ''; 
 
                 if (data.products.length === 0) {
-                    container.innerHTML = '<p class="loading">Henüz fırsat eklenmedi.</p>';
+                    container.innerHTML = '<p class="loading">Henüz ürün eklenmemiş.</p>';
                     return;
                 }
 
-                allProducts = data.products; // Listeyi hafızaya al
-                renderProducts(allProducts); // Ekrana bas
+                allProducts = data.products;
+                render(allProducts);
 
             } catch (error) {
-                console.error("Hata:", error);
-                container.innerHTML = '<p style="color:red; text-align:center; padding:2rem">Sunucuya bağlanılamadı!</p>';
+                console.error(error);
+                container.innerHTML = '<p class="loading" style="color:red">Sunucuya bağlanılamadı!</p>';
             }
         }
 
-        // Ürünleri Ekrana Basan Fonksiyon
-        function renderProducts(products) {
+        function render(products) {
             const container = document.getElementById('products-container');
-            const noResults = document.getElementById('noResults');
-            
             container.innerHTML = '';
             
-            if (products.length === 0) {
-                noResults.style.display = 'block';
-                return;
-            } else {
-                noResults.style.display = 'none';
-            }
-
             products.forEach(p => {
-                // İndirim Rozeti
-                const badgeHtml = p.discount_percent > 0 
-                    ? `<div class="badge">%${p.discount_percent} İndirim</div>` 
-                    : '';
-                
-                // Eski Fiyat
-                const oldPriceHtml = p.original_price > p.current_price 
-                    ? `<div class="old-price">${p.original_price} TL</div>` 
-                    : '<div class="old-price" style="opacity:0">.</div>';
+                const badge = p.discount_percent > 0 ? `<div class="badge">%${p.discount_percent}</div>` : '';
+                const oldPrice = p.original_price > p.current_price ? `<div class="old-price">${p.original_price} TL</div>` : '';
 
                 const html = `
-                    <div class="product-card" data-title="${p.title.toLowerCase()}" data-category="${p.category.toLowerCase()}">
-                        ${badgeHtml}
-                        <div class="card-img-wrapper">
-                            <img src="${p.image_url}" alt="${p.title}" class="card-img" onerror="this.src='https://via.placeholder.com/300?text=Resim+Yok'">
-                        </div>
+                    <div class="product-card">
+                        ${badge}
+                        <img src="${p.image_url}" class="card-img" onerror="this.src='https://via.placeholder.com/300'">
                         <div class="card-body">
-                            <div class="card-category">${p.platform}</div>
+                            <div class="card-cat">${p.platform}</div>
                             <div class="card-title" title="${p.title}">${p.title}</div>
-                            <div class="price-box">
-                                <div class="prices">
-                                    ${oldPriceHtml}
+                            <div class="price-row">
+                                <div class="price-box">
+                                    ${oldPrice}
                                     <div class="current-price">${p.current_price} TL</div>
                                 </div>
                                 <a href="${p.url}" target="_blank" class="btn-go"><i class="fas fa-arrow-right"></i></a>
                             </div>
                         </div>
-                    </div>
-                `;
+                    </div>`;
                 container.innerHTML += html;
             });
         }
 
-        // Arama Fonksiyonu
         function filterProducts() {
-            const searchText = document.getElementById('searchInput').value.toLowerCase();
-            
-            const filtered = allProducts.filter(p => 
-                p.title.toLowerCase().includes(searchText) || 
-                p.category.toLowerCase().includes(searchText) ||
-                p.platform.toLowerCase().includes(searchText)
-            );
-            
-            renderProducts(filtered);
+            const term = document.getElementById('searchInput').value.toLowerCase();
+            const filtered = allProducts.filter(p => p.title.toLowerCase().includes(term));
+            render(filtered);
         }
 
-        // Kategori Filtreleme
-        function filterByCategory(category) {
-            // Aktif butonu değiştir
-            document.querySelectorAll('.cat-item').forEach(el => el.classList.remove('active'));
+        function filterBy(cat) {
+            document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('active'));
             event.target.classList.add('active');
-
-            if (category === 'all') {
-                renderProducts(allProducts);
-            } else {
-                // Basit metin eşleşmesiyle filtrele (Ürün başlığında veya kategorisinde geçiyorsa)
+            
+            if(cat === 'all') render(allProducts);
+            else {
                 const filtered = allProducts.filter(p => 
-                    p.title.toLowerCase().includes(category.toLowerCase()) || 
-                    (p.category && p.category.toLowerCase().includes(category.toLowerCase()))
+                    p.category.toLowerCase().includes(cat.toLowerCase()) || 
+                    p.title.toLowerCase().includes(cat.toLowerCase())
                 );
-                renderProducts(filtered);
+                render(filtered);
             }
         }
     </script>
